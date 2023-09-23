@@ -1,0 +1,176 @@
+uvit attention mode is xformers
+load nnet from model_output/boy1/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/boy2/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/girl1/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/girl2/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/boy1/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/boy2/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/girl1/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
+uvit attention mode is xformers
+load nnet from model_output/girl2/final.ckpt/nnet.pth
+Create autoencoder with scale_factor=0.18215
+making attention of type 'vanilla' with 512 in_channels
+Working with z of shape (1, 4, 32, 32) = 4096 dimensions.
+making attention of type 'vanilla' with 512 in_channels
+Traceback (most recent call last):
+  File "sample.py", line 324, in <module>
+    main()
+  File "sample.py", line 280, in main
+    clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
+  File "/workspace/libs/clip.py", line 17, in __init__
+    self.tokenizer = CLIPTokenizer.from_pretrained(version)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/tokenization_utils_base.py", line 1763, in from_pretrained
+    resolved_vocab_files[file_id] = cached_file(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/transformers/utils/hub.py", line 409, in cached_file
+    resolved_file = hf_hub_download(
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 110, in _inner_fn
+    validate_repo_id(arg_value)
+  File "/root/miniconda3/envs/unidiffusion/lib/python3.8/site-packages/huggingface_hub/utils/_validators.py", line 158, in validate_repo_id
+    raise HFValidationError(
+huggingface_hub.utils._validators.HFValidationError: Repo id must be in the form 'repo_name' or 'namespace/repo_name': '/workspace_local/huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/8d052a0f05efbaefbc9e8786ba291cfdf93e5bff'. Use `repo_type` argument if needed.
