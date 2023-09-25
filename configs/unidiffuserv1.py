@@ -20,7 +20,7 @@ def get_config():
     config.log_interval = 10
     config.eval_interval = 200
     config.save_interval = 300
-    config.max_step = 10000
+    config.max_step = 8000
         
     config.num_workers = 0
     config.batch_size = 1
@@ -80,9 +80,9 @@ def get_config():
     #                   "proj", "fc1", "fc2"],
     target_modules = ["qkv","proj"],
 
-    peft_config = LoraConfig(inference_mode=False, r=64, lora_alpha=32,
-                                        lora_dropout=0,
-                                        target_modules=[])
+    peft_config = LoraConfig(inference_mode=False, r=1, lora_alpha=32,
+                                        lora_dropout=0.5,
+                                        target_modules=[]) 
     )
     config.lora.peft_config.target_modules = config.lora.target_modules
 

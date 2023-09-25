@@ -4,6 +4,7 @@ transformers==4.26.0
 einops==0.6.1
 wandb==0.15.5
 ml_collections==0.1.1
+peft
 xformers==0.0.16
 triton==2.0.0
 
