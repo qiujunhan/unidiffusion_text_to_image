@@ -79,10 +79,12 @@ class Schedule(object):  # discrete time
 
 
 
-def LSimple_T2I(img, clip_img, text, data_type, nnet, schedule, device):
+def LSimple_T2I(img, clip_img, text, data_type, nnet, schedule,sample_scores, device):
     r"""
     文到图loss
     """
+    sample_scores = sample_scores.to(device)
+    sample_loss = 1-sample_scores.mean()
     n, eps, xn = schedule.sample([img, clip_img])  # n in {1, ..., 1000}
     img_eps, clip_img_eps = eps
     img_n, clip_img_n = xn
@@ -91,7 +93,7 @@ def LSimple_T2I(img, clip_img, text, data_type, nnet, schedule, device):
 
     loss_img = mos(img_eps - img_out)
     loss_img_clip = mos(clip_img_eps - clip_img_out)
-    loss = loss_img + loss_img_clip + 0. * mos(text_out)
+    loss = loss_img + loss_img_clip + sample_loss*1e-3 + 0. * mos(text_out)
     return loss, loss_img, loss_img_clip, 0.
 
 

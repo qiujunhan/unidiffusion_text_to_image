@@ -40,7 +40,7 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr0.0001_辅助图片测试(少)/ckpts/4000.ckpt")
+    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_64dim_lr0.0001_辅助图片测试(少)/ckpts/1800.ckpt")
 
 
     caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -96,7 +96,7 @@ def train(config):
     schedule = Schedule(_betas)
     logging.info(f'use {schedule}')
 
-    def train_step(cache_text,cache_img,cache_img4clip):
+    def train_step(cache_text,cache_img,cache_img4clip,sample_scores):
         metrics = dict()
         img, img4clip, text, data_type = next(train_data_generator)
         img = img.to(device)
@@ -122,7 +122,7 @@ def train(config):
             # text = clip_text_model.encode(text)
             # text = caption_decoder.encode_prefix(text)
 
-        loss, loss_img, loss_clip_img, loss_text = LSimple_T2I(img=z, clip_img=clip_img, text=text, data_type=data_type, nnet=nnet, schedule=schedule, device=device)
+        loss, loss_img, loss_clip_img, loss_text = LSimple_T2I(img=z, clip_img=clip_img, text=text, data_type=data_type, nnet=nnet, schedule=schedule,sample_scores=sample_scores, device=device)
 
         accelerator.backward(loss.mean())
         optimizer.step()
@@ -197,20 +197,23 @@ def train(config):
 
 
 
-        return
+        return sample_scores
 
     def loop():
         log_step = train_state.step + config.eval_interval
-        eval_step = train_state.step + config.eval_interval
+        eval_step = train_state.step
         save_step = train_state.step + config.eval_interval
         cache_text = {}
         cache_img = {}
         cache_img4clip = {}
+
+        sample_scores = torch.tensor([0.,0.,0.], requires_grad=True)
         while True:
+
             nnet.train()
             with accelerator.accumulate(nnet):
 
-                metrics = train_step(cache_text,cache_img,cache_img4clip)
+                metrics = train_step(cache_text,cache_img,cache_img4clip,sample_scores)
 
             if accelerator.is_main_process:
                 nnet.eval()
@@ -221,7 +224,8 @@ def train(config):
                     log_step += config.log_interval
 
                 if total_step >= eval_step:
-                    eval(total_step,metrics)
+                    sample_scores = eval(total_step,metrics)
+                    sample_scores = torch.tensor(sample_scores, requires_grad=True)
                     eval_step += config.eval_interval
 
                 if total_step >= save_step:
