@@ -1,3 +1,4 @@
+#encoding=utf-8
 import ml_collections
 from peft import LoraConfig, TaskType,get_peft_model
 
@@ -20,11 +21,12 @@ def get_config():
     config.log_interval = 10
     config.eval_interval = 200
     config.save_interval = 300
-    config.max_step = 8000
+    config.max_step = 10000
         
     config.num_workers = 0
     config.batch_size = 1
     config.resolution = 512
+    config.suffix = "1dim_lr5e-5"
     
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"
@@ -34,7 +36,7 @@ def get_config():
 
     config.optimizer = d(
         name='adamw',
-        lr=1e-4,
+        lr=5e-5,
         weight_decay=0.03,
         betas=(0.9, 0.9),
         amsgrad=False
@@ -79,6 +81,7 @@ def get_config():
     # target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
     #                   "proj", "fc1", "fc2"],
     target_modules = ["qkv","proj"],
+        # target_modules=["qkv"],
 
     peft_config = LoraConfig(inference_mode=False, r=1, lora_alpha=32,
                                         lora_dropout=0.5,

@@ -40,7 +40,7 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1/ckpts/2300.ckpt")
+    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1/ckpts/3200.ckpt")
 
 
     caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -85,7 +85,6 @@ def train(config):
     train_dataset_loader = DataLoader(train_dataset,
                                       batch_size=config.batch_size,
                                       num_workers=config.num_workers,
-                                      shuffle=True,
                                       pin_memory=True,
                                       drop_last=True
                                       )
@@ -282,10 +281,11 @@ def main():
     config.log_dir = args.logdir
     config.outdir = args.outdir
     config.data = args.data
+
     data_name = Path(config.data).stem
 
     now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    config.workdir = os.path.join(config.log_dir, f"{config_name}-{data_name}")
+    config.workdir = os.path.join(config.log_dir, f"{config_name}-{data_name}_{config.suffix}")
     config.ckpt_root = os.path.join(config.workdir, 'ckpts')
     config.meta_dir = os.path.join(config.workdir, "meta")
     config.nnet_path = args.nnet_path

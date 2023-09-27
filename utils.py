@@ -73,7 +73,7 @@ def get_lr_scheduler(optimizer, name, **kwargs):
         name = SchedulerType(name)
         schedule_func = TYPE_TO_SCHEDULER_FUNCTION[name]
         return schedule_func(
-            optimizer,  **kwargs
+            optimizer, num_warmup_steps=0, num_training_steps=10000, num_cycles=1
         )
     elif name=="ExponentialLR":
         from torch.optim.lr_scheduler import ExponentialLR

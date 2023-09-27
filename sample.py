@@ -307,7 +307,7 @@ def main(argv=None):
     origin_keys = set(origin_dict.keys())
     nnet_mapping_dict = { name:f"base_model.model.{name}" for name in origin_keys}
 
-    # total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
+    total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
     del nnet_standard
     
     autoencoder_standard = libs.autoencoder.get_model(**config.autoencoder)
@@ -328,9 +328,9 @@ def main(argv=None):
     for prompt_index, prompt in enumerate(prompts):
         # 根据训练策略
         if "boy" in prompt:
-            prompt = prompt.replace("boy", "sks male")
+            prompt = prompt.replace("boy", "male")
         else:
-            prompt = prompt.replace("girl", "sks female")
+            prompt = prompt.replace("girl", "female")
         prompt += ",one human,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
 
         config.prompt = prompt
