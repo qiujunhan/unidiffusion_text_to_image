@@ -1,13 +1,13 @@
-accelerate==0.20.3
 absl-py==1.4.0
 transformers==4.26.0
 einops==0.6.1
 wandb==0.15.5
 ml_collections==0.1.1
 peft
+accelerate
 xformers==0.0.16
 triton==2.0.0
-
+diffusers
 insightface==0.7.3
 mxnet==1.9.1
 numpy==1.23.0

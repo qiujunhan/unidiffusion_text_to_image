@@ -40,7 +40,7 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1/ckpts/3200.ckpt")
+    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr0.0001_辅助图片测试/ckpts/2300.ckpt")
 
 
     caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -156,14 +156,15 @@ def train(config):
         sample_config.n_samples=5
         sample_config.n_iter = 1
         sample_config.sample.sample_steps=20
-        prompt="A handsome man, wearing a red outfit, sitting on a chair and eating, one man,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
-
-        sample_config.prompt = prompt
+        input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
+        add_prompt=", one man,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+        input_prompt += add_prompt
+        sample_config.prompt = input_prompt
 
         config.sample_root = os.path.join(config.workdir, 'sample_root')
         os.makedirs(config.sample_root, exist_ok=True)
         sample_config.output_path = config.sample_root
-        print("sampling with prompt:", prompt)
+        print("sampling with prompt:", input_prompt)
         from sample import sample
         import numpy as np
         import matplotlib.pyplot as plt
@@ -179,7 +180,7 @@ def train(config):
             score_face = score_eval.sim_face_emb(sample, refs_embs)
             score_clip = score_eval.sim_clip_imgembs(sample, refs_clip)
             # sample vs prompt
-            score_text = score_eval.sim_clip_text(sample, prompt)
+            score_text = score_eval.sim_clip_text(sample, input_prompt)
             sample_scores.append([score_face, score_clip, score_text])
         sample_scores = np.array(sample_scores)
         sample_scores = sample_scores.mean(axis =0)

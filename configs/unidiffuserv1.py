@@ -20,14 +20,16 @@ def get_config():
     config.gradient_accumulation_steps = 1
     config.log_interval = 10
     config.eval_interval = 200
-    config.save_interval = 300
-    config.max_step = 10000
+    config.save_interval = 400
+    config.max_step = 8000
         
     config.num_workers = 0
     config.batch_size = 1
     config.resolution = 512
-    config.suffix = "1dim_lr5e-5"
-    
+    config.lr = 1e-4
+    config.lora_dim = 1
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_辅助图片测试(少)"
+
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"
     config.clip_text_model = "huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/32bd64288804d66eefd0ccbe215aa642df71cc41"
@@ -36,7 +38,7 @@ def get_config():
 
     config.optimizer = d(
         name='adamw',
-        lr=5e-5,
+        lr=config.get_ref('lr'),
         weight_decay=0.03,
         betas=(0.9, 0.9),
         amsgrad=False
@@ -78,12 +80,12 @@ def get_config():
     )
     config.lora =d(
 
-    # target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
-    #                   "proj", "fc1", "fc2"],
-    target_modules = ["qkv","proj"],
+    target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
+                      "proj", "fc1", "fc2"],
+    # target_modules = ["qkv","proj"],
         # target_modules=["qkv"],
 
-    peft_config = LoraConfig(inference_mode=False, r=1, lora_alpha=32,
+    peft_config = LoraConfig(inference_mode=False, r=config.lora_dim, lora_alpha=32,
                                         lora_dropout=0.5,
                                         target_modules=[]) 
     )
