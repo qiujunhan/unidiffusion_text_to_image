@@ -40,7 +40,7 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr0.0001_辅助图片测试/ckpts/2300.ckpt")
+    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr0.0001_辅助图片测试(少)/ckpts/4000.ckpt")
 
 
     caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -72,11 +72,6 @@ def train(config):
     refs_embs = torch.cat(refs_embs)
 
 
-
-
-
-    
-
     """
     处理数据部分
     """
@@ -101,15 +96,13 @@ def train(config):
     schedule = Schedule(_betas)
     logging.info(f'use {schedule}')
 
-    def train_step():
+    def train_step(cache_text,cache_img,cache_img4clip):
         metrics = dict()
         img, img4clip, text, data_type = next(train_data_generator)
         img = img.to(device)
         img4clip = img4clip.to(device)
         data_type = data_type.to(device)
-        cache_text = {}
-        cache_img = {}
-        cache_img4clip = {}
+
         with torch.no_grad():
             hash_img = hash(img)
             if hash_img not in cache_text:
@@ -158,13 +151,13 @@ def train(config):
         sample_config.sample.sample_steps=20
         input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
         add_prompt=", one man,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
-        input_prompt += add_prompt
-        sample_config.prompt = input_prompt
+        change_prompt = input_prompt+add_prompt
+        sample_config.prompt = change_prompt
 
         config.sample_root = os.path.join(config.workdir, 'sample_root')
         os.makedirs(config.sample_root, exist_ok=True)
         sample_config.output_path = config.sample_root
-        print("sampling with prompt:", input_prompt)
+        print("sampling with prompt:", change_prompt)
         from sample import sample
         import numpy as np
         import matplotlib.pyplot as plt
@@ -201,19 +194,7 @@ def train(config):
         print(write_str)
         with open(os.path.join(config.sample_root,"score.log"),"a") as f:
             f.write(write_str + "\n")
-        # # 提取指标名称和得分
-        # x = metrics["total_step"]
-        # labels = [u"总分",u"人脸相似度",u"CLIP图片相似度",u"图文匹配度"]
-        # scores =[metrics[i] for i in labels]
-        # # 创建折线图
-        # plt.plot( x,scores, marker='o')
-        # # 添加标题和标签
-        # plt.title("各项指标得分")
-        # plt.xlabel("labels")
-        # plt.ylabel("得分")
-        # plt.legend()
-        # # 保存折线图为图片文件
-        # plt.savefig(os.path.join(config.sample_root,'line_chart.png'))
+
 
 
         return
@@ -222,11 +203,14 @@ def train(config):
         log_step = train_state.step + config.eval_interval
         eval_step = train_state.step + config.eval_interval
         save_step = train_state.step + config.eval_interval
+        cache_text = {}
+        cache_img = {}
+        cache_img4clip = {}
         while True:
             nnet.train()
             with accelerator.accumulate(nnet):
 
-                metrics = train_step()
+                metrics = train_step(cache_text,cache_img,cache_img4clip)
 
             if accelerator.is_main_process:
                 nnet.eval()
