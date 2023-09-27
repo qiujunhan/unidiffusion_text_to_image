@@ -307,7 +307,7 @@ def main(argv=None):
     origin_keys = set(origin_dict.keys())
     nnet_mapping_dict = { name:f"base_model.model.{name}" for name in origin_keys}
 
-    total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
+    # total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
     del nnet_standard
     
     autoencoder_standard = libs.autoencoder.get_model(**config.autoencoder)

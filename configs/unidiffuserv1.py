@@ -19,7 +19,7 @@ def get_config():
     config.data_type = 1
     config.gradient_accumulation_steps = 1
     config.log_interval = 10
-    config.eval_interval = 200
+    config.eval_interval = 2
     config.save_interval = 400
     config.max_step = 8000
         
