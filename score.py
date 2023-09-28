@@ -8,6 +8,7 @@ from PIL import Image
 import argparse
 import warnings
 from score_utils.face_model import FaceAnalysis
+import torch.nn.functional as F
 
 warnings.filterwarnings("ignore")
 
@@ -137,7 +138,59 @@ class Evaluator():
         img_sim = self.sim_clip_img(gen, ref)
     
         return alpha_text * text_sim + alpha_img * img_sim
-    
+
+class TrainEvaluator(Evaluator):
+    def __init__(self):
+        super().__init__()
+
+    def sim_clip_imgembs(self, img, embs, train=False):
+        feat = self.get_img_embedding(img)
+        if train:
+            loss1 = F.kl_div(feat[0]+abs(feat[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
+            loss2 = F.kl_div( embs.mean(dim=0) + abs(embs.mean(dim=0).min()),feat[0] + abs(feat[0].min()))
+            loss = (loss1+loss2)/2
+            similarity = feat @ embs.T
+            return loss,max(0, similarity.max().item())
+        else:
+            similarity = feat @ embs.T
+            return max(0, similarity.max().item())
+
+    def sim_clip_text(self, img, text, train=False):
+        """
+        calcualte img text similarity using CLIP
+        """
+        feat1 = self.get_img_embedding(img)
+        feat2 = self.get_text_embedding(text)
+        if train:
+            loss1 = F.kl_div(feat1[0] + abs(feat1[0].min()), feat2[0] + abs(feat2[0].min()))
+            loss2 = F.kl_div( feat2[0] + abs(feat2[0].min()),feat1[0] + abs(feat1[0].min()))
+            loss = (loss1+loss2)/2
+            similarity = feat1 @ feat2.T
+            return loss,max(0, similarity.max().item())
+        else:
+            similarity = feat1 @ feat2.T
+            return max(0, similarity.item())
+
+    def sim_face_emb(self, img1, embs, train=False):
+        """
+        calcualte face similarity using insightface
+        """
+        if type(img1) is not np.ndarray:
+            img1 = self.pil_to_cv2(img1)
+
+        feat1 = self.get_face_embedding(img1)
+
+        if feat1 is None:
+            return 0
+        elif train:
+            loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
+            loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))
+            loss = (loss1+loss2)/2
+            similarity = feat1 @ embs.T
+            return loss ,max(0, similarity.max().item())
+        else:
+            similarity = feat1 @ embs.T
+            return max(0, similarity.max().item())
 def read_img_pil(p):
     return Image.open(p)
 

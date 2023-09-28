@@ -25,9 +25,11 @@ import datetime
 from pathlib import Path
 from libs.data import PersonalizedBase
 from libs.uvit_multi_post_ln_v1 import UViT
-from score import Evaluator,read_img_pil
+from score import TrainEvaluator,read_img_pil
 import gc
 import glob
+import random
+
 import time
 
 def train(config):
@@ -55,7 +57,8 @@ def train(config):
     clip_img_model, clip_img_model_preprocess = clip.load(config.clip_img_model, jit=False)
     clip_img_model.to(device).eval().requires_grad_(False)
 
-    score_eval = Evaluator()
+    score_eval = TrainEvaluator()
+
     score_eval.clip_model, score_eval.clip_preprocess = clip_img_model,clip_img_model_preprocess
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -70,6 +73,7 @@ def train(config):
     refs_embs = [score_eval.get_face_embedding(i) for i in refs_images]
     refs_embs = [emb for emb in refs_embs if emb is not None]
     refs_embs = torch.cat(refs_embs)
+    assist_prompts = [i.strip() for i in open("processed_train_data/assist_prompts.txt", "r").readlines()]
 
 
     """
@@ -96,7 +100,7 @@ def train(config):
     schedule = Schedule(_betas)
     logging.info(f'use {schedule}')
 
-    def train_step(cache_text,cache_img,cache_img4clip,sample_scores):
+    def train_step(cache_text,cache_img,cache_img4clip,sample_loss):
         metrics = dict()
         img, img4clip, text, data_type = next(train_data_generator)
         img = img.to(device)
@@ -122,7 +126,7 @@ def train(config):
             # text = clip_text_model.encode(text)
             # text = caption_decoder.encode_prefix(text)
 
-        loss, loss_img, loss_clip_img, loss_text = LSimple_T2I(img=z, clip_img=clip_img, text=text, data_type=data_type, nnet=nnet, schedule=schedule,sample_scores=sample_scores, device=device)
+        loss, loss_img, loss_clip_img, loss_text = LSimple_T2I(img=z, clip_img=clip_img, text=text, data_type=data_type, nnet=nnet, schedule=schedule,sample_loss=sample_loss, device=device)
 
         accelerator.backward(loss.mean())
         optimizer.step()
@@ -146,10 +150,11 @@ def train(config):
         """
         from configs.sample_config import get_config as get_sample_config
         sample_config = get_sample_config()
-        sample_config.n_samples=5
+        sample_config.n_samples=1
         sample_config.n_iter = 1
         sample_config.sample.sample_steps=20
-        input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
+        # input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
+        input_prompt = random.choice(assist_prompts)
         add_prompt=", one man,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
         change_prompt = input_prompt+add_prompt
         sample_config.prompt = change_prompt
@@ -165,17 +170,21 @@ def train(config):
         plt.rcParams['axes.unicode_minus'] = False
         sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device)
         sample_scores = []
+        sample_loss = []
         for idx in range(0, sample_config.n_samples):  ## 3 generation for each prompt
             sample_path = os.path.join(config.sample_root, f"{total_step}-{idx:03}.jpg")
 
             sample = read_img_pil(sample_path)
             # sample vs ref
-            score_face = score_eval.sim_face_emb(sample, refs_embs)
-            score_clip = score_eval.sim_clip_imgembs(sample, refs_clip)
-            # sample vs prompt
-            score_text = score_eval.sim_clip_text(sample, input_prompt)
+
+            face_loss,score_face = score_eval.sim_face_emb(sample, refs_embs,train=True)
+            clip_loss,score_clip = score_eval.sim_clip_imgembs(sample, refs_clip,train=True)
+            text_loss,score_text = score_eval.sim_clip_text(sample, input_prompt,train=True)
+            sample_loss.append([face_loss.to(device),clip_loss,text_loss])
             sample_scores.append([score_face, score_clip, score_text])
         sample_scores = np.array(sample_scores)
+        sample_loss = torch.tensor(sample_loss)
+        sample_loss = - sample_loss
         sample_scores = sample_scores.mean(axis =0)
         if "总分" not in metrics:
             metrics["total_step"] = [total_step]
@@ -192,12 +201,11 @@ def train(config):
             metrics["图文匹配度"].append(sample_scores[2])
         write_str = f"total_step: {total_step} 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]} "
         print(write_str)
-        with open(os.path.join(config.sample_root,"score.log"),"a") as f:
-            f.write(write_str + "\n")
 
 
 
-        return sample_scores
+
+        return sample_scores,sample_loss
 
     def loop():
         log_step = train_state.step + config.eval_interval
@@ -207,13 +215,14 @@ def train(config):
         cache_img = {}
         cache_img4clip = {}
 
-        sample_scores = torch.tensor([0.,0.,0.], requires_grad=True)
+        sample_loss = torch.tensor([0.,0.,0.], requires_grad=True)
+        sample_scores = torch.tensor([0., 0., 0.], requires_grad=True)
         while True:
 
             nnet.train()
             with accelerator.accumulate(nnet):
 
-                metrics = train_step(cache_text,cache_img,cache_img4clip,sample_scores)
+                metrics = train_step(cache_text,cache_img,cache_img4clip,sample_loss)
 
             if accelerator.is_main_process:
                 nnet.eval()
@@ -221,10 +230,15 @@ def train(config):
                 if total_step >= log_step:
                     logging.info(utils.dct2str(dict(step=total_step, **metrics)))
                     wandb.log(utils.add_prefix(metrics, 'train'), step=total_step)
+                    write_str = f"total_step: {total_step} 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]} "
+
+                    with open(os.path.join(config.sample_root, "score.log"), "a") as f:
+                        f.write(write_str + "\n")
+
                     log_step += config.log_interval
 
                 if total_step >= eval_step:
-                    sample_scores = eval(total_step,metrics)
+                    sample_scores,sample_loss = eval(total_step,metrics)
                     sample_scores = torch.tensor(sample_scores, requires_grad=True)
                     eval_step += config.eval_interval
 

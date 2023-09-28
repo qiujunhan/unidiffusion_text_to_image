@@ -18,8 +18,8 @@ def get_config():
     config.text_dim = 64  # reduce dimension
     config.data_type = 1
     config.gradient_accumulation_steps = 1
-    config.log_interval = 10
-    config.eval_interval = 50
+    config.log_interval = 50
+    config.eval_interval = 10
     config.save_interval = 400
     config.max_step = 8000
         
@@ -28,7 +28,7 @@ def get_config():
     config.resolution = 512
     config.lr = 1e-4
     config.lora_dim = 1
-    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_辅助图片测试(少)_samplelloss"
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_loss"
 
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"
