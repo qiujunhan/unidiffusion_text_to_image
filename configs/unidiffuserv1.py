@@ -26,9 +26,9 @@ def get_config():
     config.num_workers = 0
     config.batch_size = 1
     config.resolution = 512
-    config.lr = 1e-4
+    config.lr = 1e-5
     config.lora_dim = 1
-    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_loss"
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_lossx1"
 
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"

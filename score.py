@@ -141,7 +141,13 @@ class Evaluator():
 
 class TrainEvaluator(Evaluator):
     def __init__(self):
-        super().__init__()
+        self.clip_device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # self.clip_model, self.clip_preprocess = clip.load("ViT-B/32", device=self.clip_device)
+        self.clip_tokenizer = clip.tokenize
+
+        self.face_model = FaceAnalysis(providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
+        self.face_model.prepare(ctx_id=0, det_size=(640, 640))
 
     def sim_clip_imgembs(self, img, embs, train=False):
         feat = self.get_img_embedding(img)
@@ -181,7 +187,7 @@ class TrainEvaluator(Evaluator):
         feat1 = self.get_face_embedding(img1)
 
         if feat1 is None:
-            return 0
+            return torch.tensor(-1.),0
         elif train:
             loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
             loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))

@@ -78,10 +78,10 @@ def get_config():
 
     config.lora =d(
 
-    # target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
-    #                   "proj", "fc1", "fc2"],
-    target_modules = ["qkv", "proj"],
-    peft_config = LoraConfig(inference_mode=False, r=8, lora_alpha=32,
+    target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
+                      "proj", "fc1", "fc2"],
+    # target_modules = ["qkv", "proj"],
+    peft_config = LoraConfig(inference_mode=False, r=1, lora_alpha=32,
                                         lora_dropout=0.1,
                                         target_modules=[])
     )

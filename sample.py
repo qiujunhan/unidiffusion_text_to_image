@@ -29,6 +29,9 @@ import numpy as np
 import json
 from libs.uvit_multi_post_ln_v1 import UViT
 from peft import LoraConfig, TaskType,get_peft_model
+import glob
+from score import Evaluator,read_img_pil
+
 
 def get_model_size(model):
     """
@@ -268,7 +271,8 @@ def main(argv=None):
     args = get_args()
     config.output_path = args.output_path
     config.nnet_path = os.path.join(args.restore_path, "final.ckpt",'lora_nnet.pth')
-    config.n_samples = 3
+    # config.n_samples = 3
+    config.n_samples = 15 #测试调整为15
     config.n_iter = 1
     device = "cuda"
 
@@ -277,8 +281,20 @@ def main(argv=None):
     nnet = get_peft_model(nnet, config.lora.peft_config)
     nnet_dict =torch.load("models/uvit_v1.pth", map_location='cpu')
     nnet_dict = {f"base_model.model.{key}": value for key, value in nnet_dict.items()}
+    #模型融合方案
+    lora1 = "logs/unidiffuserv1-boy1_1dim_lr0.0001_sample_kldiv_lossx1_5sample/ckpts/0810.ckpt/lora_nnet.pth"
+    lora2 = "logs/unidiffuserv1-boy1_1dim_lr0.0001_sample_kldiv_lossx1_5sample/ckpts/7610.ckpt/lora_nnet.pth"
+    lora_dict1 = torch.load(lora1, map_location='cpu')
+    lora_dict2 = torch.load(lora2, map_location='cpu')
+    # 融合权重
+    alpha = 0 # 权重融合的系数，0.5 表示两个模型权重的平均值
+    merged_weights = {}
+    for key in lora_dict1:
+        merged_weights[key] = alpha * lora_dict1[key] + (1 - alpha) * lora_dict2[key]
+    nnet_dict.update(merged_weights)
+    #加载lora
+    # nnet_dict.update(torch.load(config.nnet_path, map_location='cpu'))
 
-    nnet_dict.update(torch.load(config.nnet_path, map_location='cpu'))
     nnet.load_state_dict(nnet_dict, False)
 
 
@@ -292,6 +308,22 @@ def main(argv=None):
     autoencoder = libs.autoencoder.get_model(**config.autoencoder)
     clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
     clip_text_model.to("cpu")
+
+    #测评
+    config.data = "train_data/boy1"
+    score_eval = Evaluator()
+    refs = glob.glob(os.path.join(config.data, "*.jpg")) + glob.glob(os.path.join(config.data, "*.jpeg"))
+    refs_images = [read_img_pil(ref) for ref in refs]
+
+    refs_clip = [score_eval.get_img_embedding(i) for i in refs_images]
+    refs_clip = torch.cat(refs_clip)
+    #### print(refs_clip.shape)
+
+    refs_embs = [score_eval.get_face_embedding(i) for i in refs_images]
+    refs_embs = [emb for emb in refs_embs if emb is not None]
+    refs_embs = torch.cat(refs_embs)
+
+
     
     
 
@@ -307,7 +339,7 @@ def main(argv=None):
     origin_keys = set(origin_dict.keys())
     nnet_mapping_dict = { name:f"base_model.model.{name}" for name in origin_keys}
 
-    # total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
+    total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
     del nnet_standard
     
     autoencoder_standard = libs.autoencoder.get_model(**config.autoencoder)
@@ -325,18 +357,42 @@ def main(argv=None):
     
     # 基于给定的prompt进行生成
     prompts = json.load(open(args.prompt_path, "r"))
+    sample_scores = []
     for prompt_index, prompt in enumerate(prompts):
         # 根据训练策略
         if "boy" in prompt:
             prompt = prompt.replace("boy", "male")
         else:
             prompt = prompt.replace("girl", "female")
-        prompt += ",one human,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+        new_prompt = prompt+ ",one human, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
 
-        config.prompt = prompt
-        print("sampling with prompt:", prompt)
+        config.prompt = new_prompt
+        print("sampling with prompt:", new_prompt)
         sample(prompt_index, config, nnet, clip_text_model, autoencoder, device)
-        
+
+
+        #评分模块
+
+        for idx in range(0, config.n_samples):  ## 3 generation for each prompt
+            sample_path = os.path.join(config.output_path, f"0-{idx:03}.jpg")
+
+            sample_img = read_img_pil(sample_path)
+            # sample vs ref
+
+            score_face = score_eval.sim_face_emb(sample_img, refs_embs)
+            score_clip = score_eval.sim_clip_imgembs(sample_img, refs_clip)
+            score_text = score_eval.sim_clip_text(sample_img, prompt)
+
+            sample_scores.append([score_face, score_clip, score_text])
+    sample_scores = np.array(sample_scores)
+    sample_scores = sample_scores.mean(axis=0)
+
+
+    write_str = f" 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]}"
+    print(write_str)
+    with open(os.path.join(config.output_path, "score.log"),"w") as f:
+        f.write(write_str)
+
     print(f"\033[91m 微调参数量:\n{total_diff_parameters}\033[00m")
 
 if __name__ == "__main__":
