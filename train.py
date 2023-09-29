@@ -74,8 +74,8 @@ def train(config):
     refs_embs = [emb for emb in refs_embs if emb is not None]
     refs_embs = torch.cat(refs_embs)
     assist_prompts = [i.strip() for i in open("processed_train_data/assist_prompts.txt", "r").readlines()]
-
-
+    score_eval.refs_clip = refs_clip
+    score_eval.refs_embs = refs_embs
     """
     处理数据部分
     """
@@ -168,7 +168,7 @@ def train(config):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
-        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device)
+        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device,n=1,score_eval=score_eval)
         sample_scores = []
         sample_loss = []
         for idx in range(0, sample_config.n_samples):  ## 3 generation for each prompt

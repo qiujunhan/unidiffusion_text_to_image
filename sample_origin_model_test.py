@@ -297,9 +297,8 @@ def main(argv=None):
     
     # 基于给定的prompt进行生成
     # prompts = json.load(open(args.prompt_path, "r"))
-    prompts = ["a handsome man, wearing a red outfit, sitting on a chair and eating",
-               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian",
-               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+    prompts = [
+               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, high-definition image, high-quality lighting",
 
                ]
 

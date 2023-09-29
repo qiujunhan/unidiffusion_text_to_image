@@ -21,6 +21,8 @@ class Evaluator():
 
         self.face_model = FaceAnalysis(providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
         self.face_model.prepare(ctx_id=0, det_size=(640, 640))
+        self.refs_clip = None
+        self.refs_embs = None
 
     def pil_to_cv2(self, pil_img):
         return np.array(pil_img)[:,:,::-1]

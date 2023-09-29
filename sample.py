@@ -11,6 +11,8 @@
 """
 
 import os
+
+import math
 import ml_collections
 import torch
 import random
@@ -31,7 +33,8 @@ from libs.uvit_multi_post_ln_v1 import UViT
 from peft import LoraConfig, TaskType,get_peft_model
 import glob
 from score import Evaluator,read_img_pil
-
+from PIL import Image
+import shutil
 
 def get_model_size(model):
     """
@@ -49,15 +52,15 @@ def stable_diffusion_beta_schedule(linear_start=0.00085, linear_end=0.0120, n_ti
     return _betas.numpy()
 
 
-def prepare_contexts(config, clip_text_model, autoencoder):
+def prepare_contexts(n,config, clip_text_model, autoencoder):
 
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-    contexts = torch.randn(config.n_samples, 77, config.clip_text_dim).to(device)
-    img_contexts = torch.randn(config.n_samples, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2])
-    clip_imgs = torch.randn(config.n_samples, 1, config.clip_img_dim)
+    contexts = torch.randn(n, 77, config.clip_text_dim).to(device)
+    img_contexts = torch.randn(n, 2 * config.z_shape[0], config.z_shape[1], config.z_shape[2])
+    clip_imgs = torch.randn(n, 1, config.clip_img_dim)
 
-    prompts = [ config.prompt ] * config.n_samples
+    prompts = [ config.prompt ] * n
     contexts = clip_text_model.encode(prompts)
 
     return contexts, img_contexts, clip_imgs
@@ -76,11 +79,18 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device):
+def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=3,score_eval=None):
     """
     using_prompt: if use prompt as file name
     """
-    n_iter = config.n_iter
+
+    assert n >= config.n_samples
+    assert score_eval != None
+    assert score_eval.refs_clip != None
+    assert score_eval.refs_embs != None
+
+
+
     if config.get('benchmark', False):
         torch.backends.cudnn.benchmark = True
         torch.backends.cudnn.deterministic = False
@@ -160,12 +170,27 @@ def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device):
     def decode(_batch):
         return autoencoder.decode(_batch)
 
+    def auto_decompose(n, max_samples=10):
+        if n > 10:
+            n_iter = 1
+            n_samples = 10
+        else:
+            n_iter = 1
+            n_samples = n
 
-    contexts, img_contexts, clip_imgs = prepare_contexts(config, clip_text_model, autoencoder)
+        if n > max_samples:
+            n_samples = max_samples
+            n_iter = math.ceil(n / max_samples)
+
+        return n_iter, n_samples
+
+
+    contexts, img_contexts, clip_imgs = prepare_contexts(n,config, clip_text_model, autoencoder)
     contexts_low_dim = contexts if not use_caption_decoder else caption_decoder.encode_prefix(contexts)  # the low dimensional version of the contexts, which is the input to the nnet
 
     _n_samples = contexts_low_dim.size(0)
-
+    chunk_size = 10
+    n_iter, _n_samples = auto_decompose(_n_samples,chunk_size)
 
     def sample_fn(**kwargs):
         _z_init = torch.randn(_n_samples, *config.z_shape, device=device)
@@ -185,22 +210,56 @@ def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device):
         _z, _clip_img = split(x)
         return _z, _clip_img
 
+    contexts_low_dim_sub_lists = [contexts_low_dim[i:i + chunk_size] for i in range(0, len(contexts_low_dim), chunk_size)]
 
-    samples = None    
+    samples = None
     for i in range(n_iter):
-        _z, _clip_img = sample_fn(text=contexts_low_dim)  # conditioned on the text embedding
-        new_samples = unpreprocess(decode(_z))
-        if samples is None:
-            samples = new_samples
-        else:
-            samples = torch.vstack((samples, new_samples))
+        for contexts_low_dim in contexts_low_dim_sub_lists:
+            _z, _clip_img = sample_fn(text=contexts_low_dim)  # conditioned on the text embedding
+            new_samples = unpreprocess(decode(_z))
+            if samples is None:
+                samples = new_samples
+            else:
+                samples = torch.vstack((samples, new_samples))
+
+            # 评分模块
+    temp_path = "temp/temp_images"
+    if os.path.exists(temp_path):
+        shutil.rmtree(temp_path)
+    os.makedirs(temp_path,exist_ok=True)
+
+    for idx, sample in enumerate(samples):
+
+        save_path = os.path.join(temp_path, f'{prompt_index}-{idx:03}.jpg')
+        save_image(sample, save_path)
+
+    sample_scores=[]
+    for idx in range(0, n):
+
+        sample_path = os.path.join("temp/temp_images", f"{prompt_index}-{idx:03}.jpg")
+
+        sample_img = read_img_pil(sample_path)
+
+
+        # sample vs ref
+
+        score_face = score_eval.sim_face_emb(sample_img, score_eval.refs_embs)
+        score_clip = score_eval.sim_clip_imgembs(sample_img, score_eval.refs_clip)
+        score_text = score_eval.sim_clip_text(sample_img, config.prompt)
+
+        sample_scores.append([score_face, score_clip, score_text])
+    sample_scores = np.array(sample_scores)
+    best_samples_index =np.argsort(sample_scores.mean(axis=1))[-config.n_samples:]
+    best_samples_index = best_samples_index[::-1]
 
     os.makedirs(config.output_path, exist_ok=True)
-    for idx, sample in enumerate(samples):
+    for idx, sample in enumerate(samples[best_samples_index.copy()]):
         save_path = os.path.join(config.output_path, f'{prompt_index}-{idx:03}.jpg')
         save_image(sample, save_path)
-        
+    if os.path.exists(temp_path):
+        shutil.rmtree(temp_path)
     print(f'results are saved in {save_path}')
+    return sample_scores[best_samples_index]
 
 
 def compare_model(standard_model:torch.nn.Module, model:torch.nn.Module, mapping_dict= {}):
@@ -209,18 +268,18 @@ def compare_model(standard_model:torch.nn.Module, model:torch.nn.Module, mapping
     for parameters with same name(common key), directly compare the paramter conetent
     all other parameters will be regarded as differ paramters, except keys in mapping_dict.
     mapping_dict is a python dict class, with keys as a subset of `origin_only_keys` and values as a subset of `compare_only_keys`.
-    
+
     """
     origin_dict = dict(standard_model.named_parameters())
     origin_keys = set(origin_dict.keys())
     compare_dict = dict(model.named_parameters())
     compare_keys = set(compare_dict.keys())
-    
+
     origin_only_keys = origin_keys - compare_keys
     compare_only_keys = compare_keys - origin_keys
     common_keys = set.intersection(origin_keys, compare_keys)
-    
-    
+
+
     diff_paramters = 0
     # compare parameters of common keys
     for k in common_keys:
@@ -230,15 +289,15 @@ def compare_model(standard_model:torch.nn.Module, model:torch.nn.Module, mapping
             diff_paramters += origin_p.numel() + compare_p.numel()
         elif (origin_p - compare_p).norm() != 0:
             diff_paramters += origin_p.numel()
-    
-    
+
+
     mapping_keys = set(mapping_dict.keys())
     assert set.issubset(mapping_keys, origin_only_keys)
     assert set.issubset(set(mapping_dict.values()), compare_only_keys)
-    
+
     for k in mapping_keys:
         origin_p = origin_dict[k]
-        compare_p = compare_dict[mapping_keys[k]]
+        compare_p = compare_dict[mapping_dict[k]]
         if origin_p.shape != compare_p.shape:
             diff_paramters += origin_p.numel() + compare_p.numel()
         elif (origin_p - compare_p).norm() != 0:
@@ -246,19 +305,21 @@ def compare_model(standard_model:torch.nn.Module, model:torch.nn.Module, mapping
     # all keys left are counted
     extra_origin_keys = origin_only_keys - mapping_keys
     extra_compare_keys = compare_only_keys - set(mapping_dict.values())
-    
+
     for k in extra_compare_keys:
-        diff_paramters += compare_dict[k]
-    
+        diff_paramters += compare_dict[k].numel()
+
     for k in extra_origin_keys:
-        diff_paramters += origin_dict[k]    
-    
+        diff_paramters += origin_dict[k].numel()
+
     return diff_paramters
+
+
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--restore_path", type=str, default="models/test_model", help="nnet path to resume")
-    parser.add_argument("--prompt_path", type=str, default="eval_prompts_advance/boy1_sim.json", help="file contains prompts")
+    parser.add_argument("--restore_path", type=str, default="models/uvit_v1.pth", help="nnet path to resume")
+    parser.add_argument("--prompt_path", type=str, default="eval_prompts/boy1.json", help="file contains prompts")
     parser.add_argument("--output_path", type=str, default="outputs/boy1", help="output dir for generated images")
     return parser.parse_args()
 
@@ -271,23 +332,25 @@ def main(argv=None):
     args = get_args()
     config.output_path = args.output_path
     config.nnet_path = os.path.join(args.restore_path, "final.ckpt",'lora_nnet.pth')
-    # config.n_samples = 3
-    config.n_samples = 15 #测试调整为15
-    config.n_iter = 1
+    config.n_samples = 3
+
+    # config.n_iter = 1
     device = "cuda"
 
     # init models
     nnet = UViT(**config.nnet)
     nnet = get_peft_model(nnet, config.lora.peft_config)
+
     nnet_dict =torch.load("models/uvit_v1.pth", map_location='cpu')
+    nnet_mapping_dict = {name: f"base_model.model.{name}" for name in nnet_dict}
     nnet_dict = {f"base_model.model.{key}": value for key, value in nnet_dict.items()}
     #模型融合方案
-    lora1 = "logs/unidiffuserv1-boy1_1dim_lr0.0001_sample_kldiv_lossx1_5sample/ckpts/0810.ckpt/lora_nnet.pth"
+    lora1 = "logs/unidiffuserv1-boy1_1dim_lr1e-05_sample_kldiv_lossx1_5sample/ckpts/7610.ckpt/lora_nnet.pth"
     lora2 = "logs/unidiffuserv1-boy1_1dim_lr0.0001_sample_kldiv_lossx1_5sample/ckpts/7610.ckpt/lora_nnet.pth"
     lora_dict1 = torch.load(lora1, map_location='cpu')
     lora_dict2 = torch.load(lora2, map_location='cpu')
     # 融合权重
-    alpha = 0 # 权重融合的系数，0.5 表示两个模型权重的平均值
+    alpha = 1 # 权重融合的系数，0.5 表示两个模型权重的平均值
     merged_weights = {}
     for key in lora_dict1:
         merged_weights[key] = alpha * lora_dict1[key] + (1 - alpha) * lora_dict2[key]
@@ -298,18 +361,12 @@ def main(argv=None):
     nnet.load_state_dict(nnet_dict, False)
 
 
-    # print(f'load trained parameters from {config.nnet_path}')
-    # origin_sd = torch.load("models/uvit_v1.pth", map_location='cpu')
-    # trained_sd = torch.load(config.nnet_path, map_location="cpu")
-    # for k, v in trained_sd.items():
-    #     assert origin_sd.get(k, None) is not None
-    #     origin_sd[k] = v
-    # nnet.load_state_dict(origin_sd, False)
+
     autoencoder = libs.autoencoder.get_model(**config.autoencoder)
     clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
     clip_text_model.to("cpu")
 
-    #测评
+    # 测评
     config.data = "train_data/boy1"
     score_eval = Evaluator()
     refs = glob.glob(os.path.join(config.data, "*.jpg")) + glob.glob(os.path.join(config.data, "*.jpeg"))
@@ -322,73 +379,81 @@ def main(argv=None):
     refs_embs = [score_eval.get_face_embedding(i) for i in refs_images]
     refs_embs = [emb for emb in refs_embs if emb is not None]
     refs_embs = torch.cat(refs_embs)
+    score_eval.refs_clip = refs_clip
+    score_eval.refs_embs=refs_embs
 
 
-    
-    
+    use_diffusers = False # 是否使用diffuser，使用diffusers的选手请设置为true
+
+
 
     autoencoder_mapping_dict = {}
     clip_text_mapping_dict = {}
-    
+
+    # ------------!!!!!请保证以下代码不被修改
     total_diff_parameters = 0
-    
-    nnet_standard = UViT(**config.nnet)
-    nnet_standard.load_state_dict(torch.load("models/uvit_v1.pth", map_location='cpu'), False)
+    if not use_diffusers:
+        nnet_standard = UViT(**config.nnet)
+        nnet_standard.load_state_dict(torch.load("models/uvit_v1.pth", map_location='cpu'), False)
+        total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
+        del nnet_standard
 
-    origin_dict = dict(nnet_standard.named_parameters())
-    origin_keys = set(origin_dict.keys())
-    nnet_mapping_dict = { name:f"base_model.model.{name}" for name in origin_keys}
+        autoencoder_standard = libs.autoencoder.get_model(**config.autoencoder)
+        total_diff_parameters += compare_model(autoencoder_standard, autoencoder, autoencoder_mapping_dict)
+        del autoencoder_standard
 
-    total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
-    del nnet_standard
-    
-    autoencoder_standard = libs.autoencoder.get_model(**config.autoencoder)
-    total_diff_parameters += compare_model(autoencoder_standard, autoencoder, autoencoder_mapping_dict)
-    del autoencoder_standard
-    
-    clip_text_strandard = FrozenCLIPEmbedder(version=config.clip_text_model, device=device).to("cpu")
-    total_diff_parameters += compare_model(clip_text_strandard, clip_text_model, clip_text_mapping_dict)
-    del clip_text_strandard
-    
+        clip_text_strandard = FrozenCLIPEmbedder(version=config.clip_text_model, device=device).to("cpu")
+        total_diff_parameters += compare_model(clip_text_strandard, clip_text_model, clip_text_mapping_dict)
+        del clip_text_strandard
+    else:
+        from diffusers import UniDiffuserPipeline
+        pipe = UniDiffuserPipeline.from_pretrained("./diffusers_models")
+        nnet_standard, autoencoder_standard, clip_text_strandard = pipe.unet, pipe.vae, pipe.text_encoder
+        total_diff_parameters += compare_model(nnet_standard, nnet, nnet_mapping_dict)
+        total_diff_parameters += compare_model(autoencoder_standard, autoencoder, autoencoder_mapping_dict)
+        total_diff_parameters += compare_model(clip_text_strandard, clip_text_model, clip_text_mapping_dict)
+
+    # ------------!!!!!请保证以上代码不被修改
 
     clip_text_model.to(device)
     autoencoder.to(device)
     nnet.to(device)
-    
+
     # 基于给定的prompt进行生成
     prompts = json.load(open(args.prompt_path, "r"))
-    sample_scores = []
+    all_sample_scores = []
     for prompt_index, prompt in enumerate(prompts):
         # 根据训练策略
         if "boy" in prompt:
-            prompt = prompt.replace("boy", "male")
+            prompt = prompt.replace("boy", "man")
         else:
             prompt = prompt.replace("girl", "female")
-        new_prompt = prompt+ ",one human, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+        extend_prompt = ",a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, high-definition image, high-quality lighting"
 
-        config.prompt = new_prompt
-        print("sampling with prompt:", new_prompt)
-        sample(prompt_index, config, nnet, clip_text_model, autoencoder, device)
-
+        config.prompt = prompt
+        config.extend_prompt = extend_prompt
+        print("sampling with prompt:", prompt+extend_prompt)
+        sample_scores = sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=config.n_samples*5,score_eval=score_eval)
+        all_sample_scores.append(sample_scores)
 
         #评分模块
+        #
+        # for idx in range(0, config.n_samples):  ## 3 generation for each prompt
+        #     sample_path = os.path.join(config.output_path, f"{prompt_index}-{idx:03}.jpg")
+        #
+        #     sample_img = read_img_pil(sample_path)
+        #     # sample vs ref
+        #
+        #     score_face = score_eval.sim_face_emb(sample_img, score_eval.refs_embs)
+        #     score_clip = score_eval.sim_clip_imgembs(sample_img, score_eval.refs_clip)
+        #     score_text = score_eval.sim_clip_text(sample_img, prompt)
+        #
+        #     sample_scores.append([score_face, score_clip, score_text])
+    all_sample_scores = np.concatenate(all_sample_scores)
+    all_sample_scores = all_sample_scores.mean(axis=0)
 
-        for idx in range(0, config.n_samples):  ## 3 generation for each prompt
-            sample_path = os.path.join(config.output_path, f"0-{idx:03}.jpg")
 
-            sample_img = read_img_pil(sample_path)
-            # sample vs ref
-
-            score_face = score_eval.sim_face_emb(sample_img, refs_embs)
-            score_clip = score_eval.sim_clip_imgembs(sample_img, refs_clip)
-            score_text = score_eval.sim_clip_text(sample_img, prompt)
-
-            sample_scores.append([score_face, score_clip, score_text])
-    sample_scores = np.array(sample_scores)
-    sample_scores = sample_scores.mean(axis=0)
-
-
-    write_str = f" 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]}"
+    write_str = f" 总分{all_sample_scores.mean()} 人脸相似度{all_sample_scores[0]} CLIP图片相似度{all_sample_scores[1]} 图文匹配度{all_sample_scores[2]}"
     print(write_str)
     with open(os.path.join(config.output_path, "score.log"),"w") as f:
         f.write(write_str)
