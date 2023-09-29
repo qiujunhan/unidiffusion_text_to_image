@@ -296,13 +296,19 @@ def main(argv=None):
     nnet.to(device)
     
     # 基于给定的prompt进行生成
-    prompts = json.load(open(args.prompt_path, "r"))
+    # prompts = json.load(open(args.prompt_path, "r"))
+    prompts = ["a handsome man, wearing a red outfit, sitting on a chair and eating",
+               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian",
+               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+
+               ]
+
     for prompt_index, prompt in enumerate(prompts):
         # 根据训练策略
         if "boy" in prompt:
-            prompt = prompt.replace("boy", "sks boy")
+            prompt = prompt.replace("boy", "boy")
         else:
-            prompt = prompt.replace("girl", "sks girl")
+            prompt = prompt.replace("girl", "girl")
 
         config.prompt = prompt
         print("sampling with prompt:", prompt)
