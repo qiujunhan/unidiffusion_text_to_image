@@ -168,7 +168,7 @@ class PersonalizedBase(Dataset):
 
 
 
-        # TODO 编写图片预处理代码
+
         self.data_root = os.path.join("processed_train_data",os.path.basename(data_root))
         self.assist_photo = os.path.join("processed_train_data","assist_man_photo")
         self.assist_paths = [os.path.join(self.assist_photo, file_path) for file_path in os.listdir(self.assist_photo) if not file_path.endswith(".txt")]

@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-
+import os
+from glob import glob
 # 加载人脸检测器模型
 prototxt_path = "./deploy.prototxt.txt"
 model_path = "./res10_300x300_ssd_iter_140000_fp16.caffemodel"
@@ -36,7 +37,16 @@ def adjusted_box(box):
     y1 = int(y1 - delta_height)
     x2 = int(x2 + delta_width)
     y2 = int(y2 + delta_height)
-
+    # 扩大人脸区域的尺寸
+    expand_ratio = 0.3  # 调整扩大比例
+    dx = int((x2 - x1) * expand_ratio / 2)
+    dy = int((y2 - y1) * expand_ratio / 2)
+    x1 -= dx
+    y1 -= dy
+    x2 += dx
+    y2 += dy
+    # 在输出图片上把人脸部分用纯黑色覆盖
+    image[y1:y2, x1:x2] = [0, 0, 0]
     # 输出调整后的坐标矩阵
     adjusted_coordinates = np.array([x1, y1, x2, y2])
     return adjusted_coordinates
