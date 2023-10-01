@@ -276,3 +276,15 @@ def get_data_generator(loader, enable_tqdm, desc):
         for data in tqdm(loader, disable=not enable_tqdm, desc=desc):
             yield data
 
+def center_crop(width, height, img):
+    resample = {'box': Image.BOX, 'lanczos': Image.LANCZOS}['lanczos']
+    crop = np.min(img.shape[:2])
+    img = img[(img.shape[0] - crop) // 2: (img.shape[0] + crop) // 2,
+          (img.shape[1] - crop) // 2: (img.shape[1] + crop) // 2]  # center crop
+    try:
+        img = Image.fromarray(img, 'RGB')
+    except:
+        img = Image.fromarray(img)
+    img = img.resize((width, height), resample)  # resize the center crop from [crop, crop] to [width, height]
+
+    return np.array(img).astype(np.uint8)

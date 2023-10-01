@@ -160,6 +160,9 @@ def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device):
 
     contexts, img_contexts, clip_imgs = prepare_contexts(config, clip_text_model, autoencoder)
     contexts_low_dim = contexts if not use_caption_decoder else caption_decoder.encode_prefix(contexts)  # the low dimensional version of the contexts, which is the input to the nnet
+    #实验
+    contexts_low_dim = torch.load("processed_train_data/boy1/00000-0-00000-0-0.pt")
+    contexts_low_dim = contexts_low_dim.repeat(config.n_samples, 1, 1)
 
     _n_samples = contexts_low_dim.size(0)
 
@@ -298,7 +301,7 @@ def main(argv=None):
     # 基于给定的prompt进行生成
     # prompts = json.load(open(args.prompt_path, "r"))
     prompts = [
-               "a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, high-definition image, high-quality lighting",
+               "JINJI JINYUANG, CEO of HURUNLING",
 
                ]
 

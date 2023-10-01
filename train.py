@@ -25,6 +25,7 @@ import datetime
 from pathlib import Path
 from libs.data import PersonalizedBase
 from libs.uvit_multi_post_ln_v1 import UViT
+from sample_i2t import image_to_caption_decoder
 from score import TrainEvaluator,read_img_pil
 import gc
 import glob
@@ -42,7 +43,7 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_64dim_lr0.0001_辅助图片测试(少)/ckpts/1800.ckpt")
+    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr1e-05_usei2t/ckpts/1650.ckpt")
 
 
     caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -56,9 +57,14 @@ def train(config):
     clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
     clip_img_model, clip_img_model_preprocess = clip.load(config.clip_img_model, jit=False)
     clip_img_model.to(device).eval().requires_grad_(False)
+    i2t = image_to_caption_decoder(config,nnet=nnet,clip_img_model=clip_img_model,clip_img_model_preprocess=clip_img_model_preprocess,autoencoder=autoencoder)
+    from glob import glob
+    li = glob("processed_train_data/boy1/*")
+    for path in li:
+        i2t.img_decoder(path)
+
 
     score_eval = TrainEvaluator()
-
     score_eval.clip_model, score_eval.clip_preprocess = clip_img_model,clip_img_model_preprocess
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
@@ -106,21 +112,21 @@ def train(config):
         img = img.to(device)
         img4clip = img4clip.to(device)
         data_type = data_type.to(device)
-
+        text = text.to(device)
         with torch.no_grad():
             hash_img = hash(img)
-            if hash_img not in cache_text:
+            if hash_img not in cache_img:
                 cache_img[hash_img] = autoencoder.encode(img)
                 cache_img4clip[hash_img] = clip_img_model.encode_image(img4clip).unsqueeze(1)
-                text = clip_text_model.encode(text)
-                cache_text[hash_img] = caption_decoder.encode_prefix(text)
+                # text = clip_text_model.encode(text)
+                # cache_text[hash_img] = caption_decoder.encode_prefix(text)
                 z = cache_img[hash_img]
                 clip_img = cache_img4clip[hash_img]
-                text = cache_text[hash_img]
+                # text = cache_text[hash_img]
             else:
                 z = cache_img[hash_img]
                 clip_img = cache_img4clip[hash_img]
-                text = cache_text[hash_img]
+                # text = cache_text[hash_img]
             # z = autoencoder.encode(img)
             # clip_img = clip_img_model.encode_image(img4clip).unsqueeze(1)
             # text = clip_text_model.encode(text)
@@ -150,7 +156,7 @@ def train(config):
         """
         from configs.sample_config import get_config as get_sample_config
         sample_config = get_sample_config()
-        sample_config.n_samples=1
+        sample_config.n_samples=config.eval_samples
         sample_config.n_iter = 1
         sample_config.sample.sample_steps=20
         # input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
@@ -168,7 +174,7 @@ def train(config):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
-        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device,n=1,score_eval=score_eval)
+        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device,n=sample_config.n_samples*10,score_eval=score_eval,chunk_size = 25)
         sample_scores = []
         sample_loss = []
         for idx in range(0, sample_config.n_samples):  ## 3 generation for each prompt

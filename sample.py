@@ -32,7 +32,7 @@ import json
 from libs.uvit_multi_post_ln_v1 import UViT
 from peft import LoraConfig, TaskType,get_peft_model
 import glob
-from score import Evaluator,read_img_pil
+from score import Evaluator,read_img_pil,TrainEvaluator
 from PIL import Image
 import shutil
 
@@ -79,7 +79,7 @@ def set_seed(seed: int):
     torch.cuda.manual_seed_all(seed)
 
 
-def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=3,score_eval=None):
+def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=3,score_eval=None,chunk_size = 10):
     """
     using_prompt: if use prompt as file name
     """
@@ -189,7 +189,7 @@ def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=3,
     contexts_low_dim = contexts if not use_caption_decoder else caption_decoder.encode_prefix(contexts)  # the low dimensional version of the contexts, which is the input to the nnet
 
     _n_samples = contexts_low_dim.size(0)
-    chunk_size = 10
+
     n_iter, _n_samples = auto_decompose(_n_samples,chunk_size)
 
     def sample_fn(**kwargs):
@@ -213,16 +213,16 @@ def sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=3,
     contexts_low_dim_sub_lists = [contexts_low_dim[i:i + chunk_size] for i in range(0, len(contexts_low_dim), chunk_size)]
 
     samples = None
-    for i in range(n_iter):
-        for contexts_low_dim in contexts_low_dim_sub_lists:
-            _z, _clip_img = sample_fn(text=contexts_low_dim)  # conditioned on the text embedding
-            new_samples = unpreprocess(decode(_z))
-            if samples is None:
-                samples = new_samples
-            else:
-                samples = torch.vstack((samples, new_samples))
 
-            # 评分模块
+    for contexts_low_dim in contexts_low_dim_sub_lists:
+        _z, _clip_img = sample_fn(text=contexts_low_dim)  # conditioned on the text embedding
+        new_samples = unpreprocess(decode(_z))
+        if samples is None:
+            samples = new_samples
+        else:
+            samples = torch.vstack((samples, new_samples))
+
+        # 评分模块
     temp_path = "temp/temp_images"
     if os.path.exists(temp_path):
         shutil.rmtree(temp_path)

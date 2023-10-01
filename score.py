@@ -187,18 +187,21 @@ class TrainEvaluator(Evaluator):
             img1 = self.pil_to_cv2(img1)
 
         feat1 = self.get_face_embedding(img1)
-
-        if feat1 is None:
-            return torch.tensor(-1.),0
-        elif train:
-            loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
-            loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))
-            loss = (loss1+loss2)/2
-            similarity = feat1 @ embs.T
-            return loss ,max(0, similarity.max().item())
+        if train:
+            if feat1 is None:
+                return torch.tensor(-1.),0
+            else:
+                loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
+                loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))
+                loss = (loss1+loss2)/2
+                similarity = feat1 @ embs.T
+                return loss ,max(0, similarity.max().item())
         else:
-            similarity = feat1 @ embs.T
-            return max(0, similarity.max().item())
+            if feat1 is None:
+                return 0
+            else:
+                similarity = feat1 @ embs.T
+                return max(0, similarity.max().item())
 def read_img_pil(p):
     return Image.open(p)
 

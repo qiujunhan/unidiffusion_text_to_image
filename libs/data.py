@@ -8,7 +8,7 @@ import PIL
 from PIL import Image
 from torch.utils.data import Dataset
 import random
-
+import torch
 
 
 training_templates_smallest = [
@@ -170,11 +170,12 @@ class PersonalizedBase(Dataset):
 
 
         self.data_root = os.path.join("processed_train_data",os.path.basename(data_root))
-        self.assist_photo = os.path.join("processed_train_data","assist_man_photo")
-        self.assist_paths = [os.path.join(self.assist_photo, file_path) for file_path in os.listdir(self.assist_photo) if not file_path.endswith(".txt")]
+        # self.assist_photo = os.path.join("processed_train_data","assist_man_photo")
+        # self.assist_paths = [os.path.join(self.assist_photo, file_path) for file_path in os.listdir(self.assist_photo) if not file_path.endswith(".txt")]
 
-        self.image_paths = [os.path.join(self.data_root, file_path) for file_path in os.listdir(self.data_root) if not file_path.endswith(".txt")]
-        self.image_paths.extend(self.assist_paths)
+        self.image_paths = [os.path.join(self.data_root, file_path) for file_path in os.listdir(self.data_root) if not (file_path.endswith(".txt") or file_path.endswith(".pt"))]
+        # self.image_paths.extend(self.assist_paths)
+        self.all_text_ = [torch.load(i,map_location="cpu")[0] for i in [os.path.join(self.data_root, file_path) for file_path in os.listdir(self.data_root) if file_path.endswith(".pt")]]
         self.num_images = len(self.image_paths)
         self._length = self.num_images 
 
@@ -203,7 +204,7 @@ class PersonalizedBase(Dataset):
 
     def __getitem__(self, i):
         image_path = self.image_paths[i % self.num_images]
-
+        text_ = self.all_text_[i % self.num_images]
         pil_image = Image.open(image_path).convert("RGB")
 
         placeholder_string = self.placeholder_token
@@ -214,11 +215,12 @@ class PersonalizedBase(Dataset):
             text = random.choice(imagenet_templates_small).format(placeholder_string)
         else:
             text = random.choice(imagenet_templates_small).format(placeholder_string)
-        with open(image_path.replace("png", "txt")) as f:
+        # with open(image_path.replace(".png", ".pt")) as f:
+        #
+        #     text = f.read()
 
-            text = f.read()
         # default to score-sde preprocessing
         img = self.transform(pil_image)
         img4clip = self.transform_clip(pil_image)
         
-        return img, img4clip, text, 0
+        return img, img4clip, text_, 0

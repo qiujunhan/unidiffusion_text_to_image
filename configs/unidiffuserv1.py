@@ -18,17 +18,19 @@ def get_config():
     config.text_dim = 64  # reduce dimension
     config.data_type = 1
     config.gradient_accumulation_steps = 1
-    config.log_interval = 50
+    config.log_interval = 10
     config.eval_interval = 10
-    config.save_interval = 400
-    config.max_step = 8000
+    config.eval_samples = 5
+    config.save_interval = 200
+    config.max_step = 4000
         
     config.num_workers = 0
     config.batch_size = 1
     config.resolution = 512
-    config.lr = 1e-5
+    config.lr = 1e-4
     config.lora_dim = 1
-    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_lossx1"
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_lossx1_usei2t"
+    # config.suffix = f"{config.lora_dim}dim_lr{config.lr}_usei2t"
 
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"

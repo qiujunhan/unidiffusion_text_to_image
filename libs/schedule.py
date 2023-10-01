@@ -93,7 +93,7 @@ def LSimple_T2I(img, clip_img, text, data_type, nnet, schedule,sample_loss, devi
 
     loss_img = mos(img_eps - img_out)
     loss_img_clip = mos(clip_img_eps - clip_img_out)
-    loss = loss_img + loss_img_clip + sample_loss + 0. * mos(text_out)
+    loss = loss_img + loss_img_clip +sample_loss*(1e-2) + 0. * mos(text_out)
     return loss, loss_img, loss_img_clip, 0.
 
 
