@@ -7,7 +7,7 @@ def d(**kwargs):
     return ml_collections.ConfigDict(initial_dictionary=kwargs)
 
 
-def get_config():
+def get_config(max_step,**kwargs):
     config = ml_collections.ConfigDict()
 
     config.seed = 1234
@@ -18,24 +18,29 @@ def get_config():
     config.text_dim = 64  # reduce dimension
     config.data_type = 1
     config.gradient_accumulation_steps = 1
-    config.log_interval = 10
-    config.eval_interval = 10
+    config.log_interval = 100
+    config.eval_interval = 1000
     config.eval_samples = 5
-    config.save_interval = 200
-    config.max_step = 4000
-        
+    config.n_select = 30 #n张图片选1张
+    config.save_interval = config.eval_interval
+    config.max_step = max_step
+    assert config.max_step > config.eval_interval
+
     config.num_workers = 0
     config.batch_size = 1
     config.resolution = 512
     config.lr = 1e-4
     config.lora_dim = 1
-    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_kldiv_lossx1_usei2t"
-    # config.suffix = f"{config.lora_dim}dim_lr{config.lr}_usei2t"
+    # config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_新kldiv_loss_提升图文权重_usei2t"
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_usei2t_提交版"
 
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"
     config.clip_text_model = "huggingface/hub/models--openai--clip-vit-large-patch14/snapshots/32bd64288804d66eefd0ccbe215aa642df71cc41"
     config.only_load_model = True
+    for k,v in kwargs.items():
+        config[k] = v
+
     
 
     config.optimizer = d(
@@ -82,16 +87,18 @@ def get_config():
     )
     config.lora =d(
 
-    target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
-                      "proj", "fc1", "fc2"],
-    # target_modules = ["qkv","proj"],
-        # target_modules=["qkv"],
+    # target_modules = ["text_embed", "text_out", "clip_img_embed", "clip_img_out", "qkv",
+    #                   "proj", "fc1", "fc2"],
+
+    target_modules_edit = ["proj"],
+        target_modules_sim=["text_embed", "text_out", "clip_img_embed", "clip_img_out",
+                       "proj", "fc1", "fc2"],
 
     peft_config = LoraConfig(inference_mode=False, r=config.lora_dim, lora_alpha=32,
                                         lora_dropout=0.5,
                                         target_modules=[]) 
     )
-    config.lora.peft_config.target_modules = config.lora.target_modules
+
 
 
     # sample

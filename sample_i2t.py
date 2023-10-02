@@ -160,7 +160,7 @@ class image_to_caption_decoder():
 
 
 
-        torch.save(torch.concatenate(all_text).mean(0).unsqueeze(0),img_path.replace(".png",".pt"))
+        torch.save(torch.concatenate(all_text).mean(0).unsqueeze(0),img_path.replace(".png",".pt").replace(".jpg",".pt").replace(".jpeg",".pt"))
 
 
 

@@ -331,9 +331,16 @@ def main(argv=None):
     config = get_config()
     args = get_args()
     config.output_path = args.output_path
-    config.nnet_path = os.path.join(args.restore_path, "final.ckpt",'lora_nnet.pth')
-    config.n_samples = 3
 
+    config.n_samples = 3
+    config.style ="edit" if "edit" in args.prompt_path else "sim"
+    if config.style == "edit":
+        config.nnet_path = os.path.join(args.restore_path, "final.ckpt", "edit", "lora_nnet.pth")
+
+        config.lora.peft_config.target_modules = config.lora.target_modules_edit
+    elif config.style == "sim":
+        config.nnet_path = os.path.join(args.restore_path, "final.ckpt", "sim", "lora_nnet.pth")
+        config.lora.peft_config.target_modules = config.lora.target_modules_sim
     # config.n_iter = 1
     device = "cuda"
 
@@ -344,19 +351,13 @@ def main(argv=None):
     nnet_dict =torch.load("models/uvit_v1.pth", map_location='cpu')
     nnet_mapping_dict = {name: f"base_model.model.{name}" for name in nnet_dict}
     nnet_dict = {f"base_model.model.{key}": value for key, value in nnet_dict.items()}
-    #模型融合方案
-    lora1 = "logs/unidiffuserv1-boy1_1dim_lr1e-05_sample_kldiv_lossx1_5sample/ckpts/7610.ckpt/lora_nnet.pth"
-    lora2 = "logs/unidiffuserv1-boy1_1dim_lr0.0001_sample_kldiv_lossx1_5sample/ckpts/7610.ckpt/lora_nnet.pth"
-    lora_dict1 = torch.load(lora1, map_location='cpu')
-    lora_dict2 = torch.load(lora2, map_location='cpu')
-    # 融合权重
-    alpha = 1 # 权重融合的系数，0.5 表示两个模型权重的平均值
-    merged_weights = {}
-    for key in lora_dict1:
-        merged_weights[key] = alpha * lora_dict1[key] + (1 - alpha) * lora_dict2[key]
-    nnet_dict.update(merged_weights)
+
+
     #加载lora
-    # nnet_dict.update(torch.load(config.nnet_path, map_location='cpu'))
+
+
+    nnet_dict.update(torch.load(config.nnet_path, map_location='cpu'))
+
 
     nnet.load_state_dict(nnet_dict, False)
 
@@ -428,7 +429,7 @@ def main(argv=None):
             prompt = prompt.replace("boy", "man")
         else:
             prompt = prompt.replace("girl", "female")
-        extend_prompt = ",a handsome man, wearing a red outfit, sitting on a chair and eating,Chinese, Asian, high-definition image, high-quality lighting"
+        extend_prompt = ",Chinese, Asian, high-definition image, high-quality lighting"
 
         config.prompt = prompt
         config.extend_prompt = extend_prompt
@@ -436,25 +437,12 @@ def main(argv=None):
         sample_scores = sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=config.n_samples*5,score_eval=score_eval)
         all_sample_scores.append(sample_scores)
 
-        #评分模块
-        #
-        # for idx in range(0, config.n_samples):  ## 3 generation for each prompt
-        #     sample_path = os.path.join(config.output_path, f"{prompt_index}-{idx:03}.jpg")
-        #
-        #     sample_img = read_img_pil(sample_path)
-        #     # sample vs ref
-        #
-        #     score_face = score_eval.sim_face_emb(sample_img, score_eval.refs_embs)
-        #     score_clip = score_eval.sim_clip_imgembs(sample_img, score_eval.refs_clip)
-        #     score_text = score_eval.sim_clip_text(sample_img, prompt)
-        #
-        #     sample_scores.append([score_face, score_clip, score_text])
     all_sample_scores = np.concatenate(all_sample_scores)
     all_sample_scores = all_sample_scores.mean(axis=0)
 
 
     write_str = f" 总分{all_sample_scores.mean()} 人脸相似度{all_sample_scores[0]} CLIP图片相似度{all_sample_scores[1]} 图文匹配度{all_sample_scores[2]}"
-    print(write_str)
+    # print(write_str)
     with open(os.path.join(config.output_path, "score.log"),"w") as f:
         f.write(write_str)
 

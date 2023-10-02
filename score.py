@@ -154,9 +154,14 @@ class TrainEvaluator(Evaluator):
     def sim_clip_imgembs(self, img, embs, train=False):
         feat = self.get_img_embedding(img)
         if train:
-            loss1 = F.kl_div(feat[0]+abs(feat[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
-            loss2 = F.kl_div( embs.mean(dim=0) + abs(embs.mean(dim=0).min()),feat[0] + abs(feat[0].min()))
-            loss = (loss1+loss2)/2
+            # loss1 = F.kl_div(feat[0]+abs(feat[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
+            # loss2 = F.kl_div( embs.mean(dim=0) + abs(embs.mean(dim=0).min()),feat[0] + abs(feat[0].min()))
+            # loss = (loss1+loss2)/2
+
+            probs = feat[0]
+            target = embs.mean(dim=0)
+            loss = F.kl_div(F.log_softmax(probs.unsqueeze(0) , dim=1),F.softmax(target.unsqueeze(0) , dim=1))  # 如果probs和target已经是softmax的形式，就只需要给probs取对数输入就行了
+
             similarity = feat @ embs.T
             return loss,max(0, similarity.max().item())
         else:
@@ -170,9 +175,13 @@ class TrainEvaluator(Evaluator):
         feat1 = self.get_img_embedding(img)
         feat2 = self.get_text_embedding(text)
         if train:
-            loss1 = F.kl_div(feat1[0] + abs(feat1[0].min()), feat2[0] + abs(feat2[0].min()))
-            loss2 = F.kl_div( feat2[0] + abs(feat2[0].min()),feat1[0] + abs(feat1[0].min()))
-            loss = (loss1+loss2)/2
+            # loss1 = F.kl_div(feat1[0] + abs(feat1[0].min()), feat2[0] + abs(feat2[0].min()))
+            # loss2 = F.kl_div( feat2[0] + abs(feat2[0].min()),feat1[0] + abs(feat1[0].min()))
+            # loss = (loss1+loss2)/2
+            probs = feat1[0]
+            target = feat2[0]
+
+            loss  = F.kl_div(F.log_softmax(probs.unsqueeze(0), dim=1), F.softmax(target.unsqueeze(0), dim=1))
             similarity = feat1 @ feat2.T
             return loss,max(0, similarity.max().item())
         else:
@@ -191,9 +200,15 @@ class TrainEvaluator(Evaluator):
             if feat1 is None:
                 return torch.tensor(-1.),0
             else:
-                loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
-                loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))
-                loss = (loss1+loss2)/2
+                # loss1 = F.kl_div(feat1[0]+abs(feat1[0].min()), embs.mean(dim=0)+abs(embs.mean(dim=0).min()))
+                # loss2 = F.kl_div( embs.mean(dim=0)+abs(embs.mean(dim=0).min()),feat1[0]+abs(feat1[0].min()))
+                # loss = (loss1+loss2)/2
+                probs = feat1
+                target = embs.mean(dim=0)
+                loss = F.kl_div(F.log_softmax(probs , dim=1),
+                                F.softmax(target.unsqueeze(0) , dim=1))  # 如果probs和target已经是softmax的形式，就只需要给probs取对数输入就行了
+
+
                 similarity = feat1 @ embs.T
                 return loss ,max(0, similarity.max().item())
         else:

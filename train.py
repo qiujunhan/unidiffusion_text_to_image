@@ -28,10 +28,11 @@ from libs.uvit_multi_post_ln_v1 import UViT
 from sample_i2t import image_to_caption_decoder
 from score import TrainEvaluator,read_img_pil
 import gc
-import glob
+from glob import glob
 import random
-
+from process_data import DataProcessing
 import time
+import re
 
 def train(config):
     
@@ -43,10 +44,16 @@ def train(config):
     
     train_state = utils.initialize_train_state(config, device, uvit_class=UViT)
     logging.info(f'load nnet from {config.nnet_path}')
-    # train_state.resume( ckpt_path="logs/unidiffuserv1-boy1_1dim_lr1e-05_usei2t/ckpts/1650.ckpt")
-
-
-    caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
+    if config.resume != None:
+        train_state.resume(config.resume)
+    #加载权重
+    if config.mode == "sim":
+        # train_state.resume( ckpt_path=os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_only_proj_裁剪加原图/ckpts/",config.mode,"0040.ckpt"))
+        pass
+    elif config.mode == "edit":
+        # train_state.resume( ckpt_path=os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_only_proj_裁剪加原图/ckpts/",config.mode,"0020.ckpt"))
+        pass
+    # caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
 
     nnet, optimizer = accelerator.prepare(train_state.nnet, train_state.optimizer)
     nnet.to(device)
@@ -57,11 +64,7 @@ def train(config):
     clip_text_model = FrozenCLIPEmbedder(version=config.clip_text_model, device=device)
     clip_img_model, clip_img_model_preprocess = clip.load(config.clip_img_model, jit=False)
     clip_img_model.to(device).eval().requires_grad_(False)
-    i2t = image_to_caption_decoder(config,nnet=nnet,clip_img_model=clip_img_model,clip_img_model_preprocess=clip_img_model_preprocess,autoencoder=autoencoder)
-    from glob import glob
-    li = glob("processed_train_data/boy1/*")
-    for path in li:
-        i2t.img_decoder(path)
+
 
 
     score_eval = TrainEvaluator()
@@ -69,7 +72,13 @@ def train(config):
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     gc.collect()
-    refs = glob.glob(os.path.join(config.data, "*.jpg")) + glob.glob(os.path.join(config.data, "*.jpeg"))
+    #图片预处理
+    i2t = image_to_caption_decoder(config,nnet=nnet,clip_img_model=clip_img_model,clip_img_model_preprocess=clip_img_model_preprocess,autoencoder=autoencoder)
+    data_preprocess = DataProcessing(data_path=config.data,i2t=i2t,mode=config.mode)
+    data_preprocess.process()
+
+
+    refs = glob(os.path.join(config.data, "*.jpg")) + glob(os.path.join(config.data, "*.jpeg"))
     refs_images = [read_img_pil(ref) for ref in refs]
 
     refs_clip = [score_eval.get_img_embedding(i) for i in refs_images]
@@ -86,7 +95,9 @@ def train(config):
     处理数据部分
     """
     # process data
-    train_dataset = PersonalizedBase(config.data, resolution=512, class_word="boy" if "boy" in config.data else "girl")
+
+
+    train_dataset = PersonalizedBase(config.data,config=config, resolution=512, class_word="man" if "boy" in config.data else "girl")
     train_dataset_loader = DataLoader(train_dataset,
                                       batch_size=config.batch_size,
                                       num_workers=config.num_workers,
@@ -159,9 +170,11 @@ def train(config):
         sample_config.n_samples=config.eval_samples
         sample_config.n_iter = 1
         sample_config.sample.sample_steps=20
-        # input_prompt = "a handsome man, wearing a red outfit, sitting on a chair and eating"
-        input_prompt = random.choice(assist_prompts)
-        add_prompt=", one man,Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
+        input_prompt = "a {}, wearing a red outfit, sitting on a chair and eating"
+        class_word = "man" if "boy" in config.data else "girl"
+        # input_prompt = random.choice(assist_prompts)
+        input_prompt = input_prompt.format(class_word)
+        add_prompt=",Chinese, Asian, lifestyle photo, photography shot, high-definition image, high-quality lighting, visible facial features, single image, non-collage."
         change_prompt = input_prompt+add_prompt
         sample_config.prompt = change_prompt
 
@@ -174,7 +187,7 @@ def train(config):
         import matplotlib.pyplot as plt
         plt.rcParams['font.sans-serif'] = ['SimHei']
         plt.rcParams['axes.unicode_minus'] = False
-        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device,n=sample_config.n_samples*10,score_eval=score_eval,chunk_size = 25)
+        sample(total_step, sample_config, nnet, clip_text_model, autoencoder, device,n=sample_config.n_samples*config.n_select,score_eval=score_eval,chunk_size = 10)
         sample_scores = []
         sample_loss = []
         for idx in range(0, sample_config.n_samples):  ## 3 generation for each prompt
@@ -186,25 +199,13 @@ def train(config):
             face_loss,score_face = score_eval.sim_face_emb(sample, refs_embs,train=True)
             clip_loss,score_clip = score_eval.sim_clip_imgembs(sample, refs_clip,train=True)
             text_loss,score_text = score_eval.sim_clip_text(sample, input_prompt,train=True)
-            sample_loss.append([face_loss.to(device),clip_loss,text_loss])
+            sample_loss.append([face_loss*0.5,clip_loss*0,text_loss*2])
             sample_scores.append([score_face, score_clip, score_text])
+            os.rename(sample_path, os.path.join(config.sample_root, f"{config.mode}_{total_step}-{idx:03}.jpg"))
         sample_scores = np.array(sample_scores)
         sample_loss = torch.tensor(sample_loss)
-        sample_loss = - sample_loss
         sample_scores = sample_scores.mean(axis =0)
-        if "总分" not in metrics:
-            metrics["total_step"] = [total_step]
-            metrics["总分"] = [sample_scores.mean()]
-            metrics["人脸相似度"] = [sample_scores[0]]
-            metrics["CLIP图片相似度"] = [sample_scores[1]]
-            metrics["图文匹配度"] = [sample_scores[2]]
 
-        else:
-            metrics["total_step"].append(total_step)
-            metrics["总分"].append(sample_scores.mean())
-            metrics["人脸相似度"].append(sample_scores[0])
-            metrics["CLIP图片相似度"].append(sample_scores[1])
-            metrics["图文匹配度"].append(sample_scores[2])
         write_str = f"total_step: {total_step} 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]} "
         print(write_str)
 
@@ -214,9 +215,10 @@ def train(config):
         return sample_scores,sample_loss
 
     def loop():
+
         log_step = train_state.step + config.eval_interval
-        eval_step = train_state.step
-        save_step = train_state.step + config.eval_interval
+        eval_step = train_state.step + config.eval_interval
+        save_step = train_state.step + config.save_interval
         cache_text = {}
         cache_img = {}
         cache_img4clip = {}
@@ -233,7 +235,15 @@ def train(config):
             if accelerator.is_main_process:
                 nnet.eval()
                 total_step = train_state.step * config.batch_size
-                if total_step >= log_step:
+                if total_step >= eval_step or total_step  == config.max_step:
+                    sample_scores,sample_loss = eval(total_step,metrics)
+                    sample_scores = torch.tensor(sample_scores, requires_grad=True)
+
+                    # last_save_step = max(config.save_interval,min(total_step,save_step))
+
+                    train_state.add_sample(save_step,sample_scores)
+                    eval_step += config.eval_interval
+                if total_step >= log_step or total_step  == config.max_step:
                     logging.info(utils.dct2str(dict(step=total_step, **metrics)))
                     wandb.log(utils.add_prefix(metrics, 'train'), step=total_step)
                     write_str = f"total_step: {total_step} 总分{sample_scores.mean()} 人脸相似度{sample_scores[0]} CLIP图片相似度{sample_scores[1]} 图文匹配度{sample_scores[2]} "
@@ -243,12 +253,9 @@ def train(config):
 
                     log_step += config.log_interval
 
-                if total_step >= eval_step:
-                    sample_scores,sample_loss = eval(total_step,metrics)
-                    sample_scores = torch.tensor(sample_scores, requires_grad=True)
-                    eval_step += config.eval_interval
 
-                if total_step >= save_step:
+
+                if total_step >= save_step :
                     logging.info(f'Save and eval checkpoint {total_step}...')
                     train_state.save(os.path.join(config.ckpt_root, f'{total_step:04}.ckpt'))
                     
@@ -259,11 +266,16 @@ def train(config):
             if total_step  >= config.max_step:
                 logging.info(f"saving final ckpts to {config.outdir}...")
                 # <<<notice>>> 只需要保存被优化的部分的参数即可，不必保存整个模型
+                train_state.save(os.path.join(config.ckpt_root, f'{total_step:04}.ckpt'))
 
-                train_state.save( os.path.join(config.outdir, 'final.ckpt'))
-                break
+                #开始分析log，择优选择模型保存到model_output
 
-    loop()
+                best_source_path,now_step = train_state.copy_best_ckpt(log_path=config.ckpt_root,final_path=os.path.join(config.outdir, 'final.ckpt',config.mode),config=config)
+                return best_source_path,now_step
+
+
+    best_source_path,now_step = loop()
+    return best_source_path,now_step
 
 
 
@@ -284,23 +296,45 @@ def get_args():
 def main():
     # 赛手需要根据自己的需求修改config file
     from configs.unidiffuserv1 import get_config
-    config = get_config()
-    config_name = "unidiffuserv1"
-    args = get_args()
-    config.log_dir = args.logdir
-    config.outdir = args.outdir
-    config.data = args.data
 
-    data_name = Path(config.data).stem
+    modes = ["sim", "edit",]
+    for mode in modes:
+        if mode == "sim":
+            config = get_config(max_step=10000)
+            config.mode="sim"
+            config.lora.peft_config.target_modules = config.lora.target_modules_sim
 
-    now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
-    config.workdir = os.path.join(config.log_dir, f"{config_name}-{data_name}_{config.suffix}")
-    config.ckpt_root = os.path.join(config.workdir, 'ckpts')
-    config.meta_dir = os.path.join(config.workdir, "meta")
-    config.nnet_path = args.nnet_path
-    os.makedirs(config.workdir, exist_ok=True)
+        elif mode == "edit":
+            config = get_config(max_step=4500)
+            config.mode = "edit"
+            config.lora.peft_config.target_modules = config.lora.target_modules_edit
 
-    train(config)
+
+
+        config_name = "unidiffuserv1"
+        args = get_args()
+        config.log_dir = args.logdir
+        config.outdir = args.outdir
+        config.data = args.data
+        data_name = Path(config.data).stem
+        now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+        config.workdir = os.path.join(config.log_dir, f"{config_name}-{data_name}_{config.suffix}")
+
+        config.ckpt_root = os.path.join(config.workdir, 'ckpts', config.mode)
+        config.meta_dir = os.path.join(config.workdir, "meta")
+        config.nnet_path = args.nnet_path
+        os.makedirs(config.workdir, exist_ok=True)
+        config.resume = None
+        #粗调到精调
+        while config.save_interval > 1:
+            best_source_path,now_step = train(config)
+            config.max_step = now_step + config.save_interval
+            config.save_interval //=2
+            config.eval_interval //=2
+            config.resume = best_source_path
+
+
+
 
 
 if __name__ == "__main__":

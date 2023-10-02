@@ -155,6 +155,7 @@ def _transform(n_px):
 class PersonalizedBase(Dataset):
     def __init__(self,
                  data_root,
+                 config,
                  resolution,
                  repeats=100,
                  flip_p=0.5,
@@ -164,12 +165,13 @@ class PersonalizedBase(Dataset):
                  mixing_prob=0.25,
                  coarse_class_text=None,
                  reg = False
+
                  ):
 
 
 
 
-        self.data_root = os.path.join("processed_train_data",os.path.basename(data_root))
+        self.data_root = os.path.join("processed_train_data",os.path.basename(data_root),config.mode)
         # self.assist_photo = os.path.join("processed_train_data","assist_man_photo")
         # self.assist_paths = [os.path.join(self.assist_photo, file_path) for file_path in os.listdir(self.assist_photo) if not file_path.endswith(".txt")]
 

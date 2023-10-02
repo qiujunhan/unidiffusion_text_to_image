@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 from libs.clip import FrozenCLIPEmbedder
 from peft import LoraConfig, TaskType,get_peft_model
 from diffusers.optimization import SchedulerType, TYPE_TO_SCHEDULER_FUNCTION
-
+import shutil
 def get_config_name():
     argv = sys.argv
     for i in range(1, len(argv)):
@@ -100,16 +100,74 @@ class TrainState(object):
         self.nnet_ema = nnet_ema
         self.lorann = lorann
         self.t2i_adapter = t2i_adapter
+        self.sample_score = {}
 
+
+    def add_sample(self,step,scores):
+        self.sample_score[step] = scores
     def ema_update(self, rate=0.9999):
         if self.nnet_ema is not None:
             ema(self.nnet_ema, self.nnet, rate)
+
+
+
+    def copy_files(self,source_folder, destination_folder):
+        # 遍历源文件夹中的所有文件
+        for filename in os.listdir(source_folder):
+            source_file = os.path.join(source_folder, filename)
+            destination_file = os.path.join(destination_folder, filename)
+
+            # 如果是文件，则复制到目标文件夹
+            if os.path.isfile(source_file):
+                shutil.copy2(source_file, destination_file)
+            # 如果是文件夹，则递归复制子文件夹中的文件
+            elif os.path.isdir(source_file):
+                shutil.copytree(source_file, destination_file)
+    def copy_best_ckpt(self,log_path,final_path,config):
+        if config.mode == "sim":
+            #最后和人脸得分最大优先原则
+            best_step = -1
+            best_face = -1
+            best_scores = np.array([])
+            for step,tensor in list(self.sample_score.items()):
+                score_face,score_clip,score_text = tensor.detach().numpy()
+
+                if score_face > best_face:
+                    best_scores =tensor.detach().numpy()
+                    best_face = score_face
+                    best_step = step
+
+            best_source_path = os.path.join(log_path, f'{best_step:04}.ckpt')
+
+            with open(os.path.join(final_path,"info.txt"), "a") as f:
+                f.write(f"sim模型 best_step:{best_step} best_face_score:{best_face} scores:{str(best_scores)}\n")
+            self.copy_files(source_folder=best_source_path,destination_folder=final_path)
+        elif config.mode == "edit":
+            #最早最高分原则
+            best_step = -1
+            best_mean_score = -1
+            best_scores = np.array([])
+            for step, tensor in list(self.sample_score.items())[::-1]:
+                score_face, score_clip, score_text = tensor.detach().numpy()
+                mean_score = tensor.detach().numpy().mean()
+                if mean_score > best_mean_score:
+                    best_scores= tensor.detach().numpy()
+                    best_mean_score = mean_score
+                    best_step = step
+            best_source_path = os.path.join(log_path, f'{best_step:04}.ckpt')
+            with open(os.path.join(final_path,"info.txt"), "a") as f:
+                f.write(f"sim模型 best_step:{best_step} best_mean_score:{best_mean_score} scores:{str(best_scores)}\n")
+            self.copy_files(source_folder=best_source_path, destination_folder=final_path)
+        return best_source_path,best_step
 
     def save(self, path):
         os.makedirs(path, exist_ok=True)
         torch.save(self.step, os.path.join(path, 'step.pth'))
 
         for key, val in self.__dict__.items():
+            if key == "sample_score":
+                torch.save(val, os.path.join(path, f'{key}.pth'))
+                continue
             if key != 'step' and val is not None:
                 if key == "nnet":
                     lora_weights = {}
@@ -135,6 +193,10 @@ class TrainState(object):
                     val.load_state_dict(torch.load(os.path.join(ckpt_path, f'{key}.pth'), map_location='cpu'))
         else:
             for key, val in self.__dict__.items():
+                if key == "sample_score":
+                    val = torch.load(os.path.join(ckpt_path, f'{key}.pth'), map_location='cpu')
+                    self.sample_score=val
+                    continue
                 if key != 'step' and val is not None:
                     if key == "nnet":
                         val.load_state_dict(torch.load(os.path.join(ckpt_path, f'lora_{key}.pth') ,map_location='cpu'),False)
@@ -240,7 +302,7 @@ def setup(config):
     import accelerate
     import wandb
 
-    mp.set_start_method('spawn')
+    mp.set_start_method('spawn',force=True)
     assert config.gradient_accumulation_steps == 1, \
         'fix the lr_scheduler bug before using larger gradient_accumulation_steps'
     # accelerator = accelerate.Accelerator(gradient_accumulation_steps=config.gradient_accumulation_steps)
