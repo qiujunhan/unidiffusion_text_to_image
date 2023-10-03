@@ -11,6 +11,7 @@ from libs.clip import FrozenCLIPEmbedder
 from peft import LoraConfig, TaskType,get_peft_model
 from diffusers.optimization import SchedulerType, TYPE_TO_SCHEDULER_FUNCTION
 import shutil
+from glob import glob
 def get_config_name():
     argv = sys.argv
     for i in range(1, len(argv)):
@@ -126,39 +127,46 @@ class TrainState(object):
     def copy_best_ckpt(self,log_path,final_path,config):
         os.makedirs(final_path,exist_ok=True)
         if config.mode == "sim":
-            #最后和人脸得分最大优先原则
+            #最后和人脸+clip得分最大优先原则
             best_step = -1
-            best_face = -1
+            best_face_and_clip = -1
             best_scores = np.array([])
             for step,tensor in list(self.sample_score.items()):
                 score_face,score_clip,score_text = tensor.detach().numpy()
 
-                if score_face > best_face:
-                    best_scores =tensor.detach().numpy()
-                    best_face = score_face
+                if score_face > best_face_and_clip:
+                    best_scores =tensor.detach().numpy()[:2]
+                    best_face_and_clip = score_face+score_clip
                     best_step = step
 
             best_source_path = os.path.join(log_path, f'{best_step:04}.ckpt')
 
             with open(os.path.join(final_path,"info.txt"), "a") as f:
-                f.write(f"sim模型 best_step:{best_step} best_face_score:{best_face} scores:{str(best_scores)}\n")
-            self.copy_files(source_folder=best_source_path,destination_folder=final_path)
+                f.write(f"sim模型 best_step:{best_step} best_face_and_clip:{best_face_and_clip} scores:{str(best_scores)}\n")
         elif config.mode == "edit":
             #最早最高分原则
             best_step = -1
             best_mean_score = -1
             best_scores = np.array([])
-            for step, tensor in list(self.sample_score.items())[::-1]:
+
+            for step, tensor in self.sample_score.items():
                 score_face, score_clip, score_text = tensor.detach().numpy()
-                mean_score = tensor.detach().numpy().mean()
+                scores = tensor.detach().numpy()
+                if scores[2] <= 0.24:
+                    continue
+                mean_score=scores.mean()
                 if mean_score > best_mean_score:
-                    best_scores= tensor.detach().numpy()
+                    best_scores= scores
                     best_mean_score = mean_score
                     best_step = step
+            assert best_step != -1
             best_source_path = os.path.join(log_path, f'{best_step:04}.ckpt')
             with open(os.path.join(final_path,"info.txt"), "a") as f:
-                f.write(f"edit模型 best_step:{best_step} best_mean_score:{best_mean_score} scores:{str(best_scores)}\n")
-            self.copy_files(source_folder=best_source_path, destination_folder=final_path)
+                f.write(f"edit模型 best_step:{best_step} best_mean_score:{best_mean_score}  scores:{str(best_scores)}\n")
+        else:
+            raise
+
+        self.copy_files(source_folder=best_source_path, destination_folder=final_path)
         return best_source_path,best_step
 
     def save(self, path):

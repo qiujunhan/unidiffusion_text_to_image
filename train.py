@@ -47,6 +47,7 @@ def train(config):
     if config.resume != None:
         train_state.resume(config.resume)
         print(f"精细化微调，加载{config.resume}继续训练")
+        print(f"eval频率{config.eval_interval}")
 
 
     # caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
@@ -317,6 +318,7 @@ def main():
         args = get_args()
         config.log_dir = args.logdir
         config.outdir = args.outdir
+
         config.data = args.data
         data_name = Path(config.data).stem
         now = datetime.datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
@@ -327,14 +329,18 @@ def main():
         config.nnet_path = args.nnet_path
         os.makedirs(config.workdir, exist_ok=True)
 
-        config.resume = os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_提交版/ckpts/",config.mode,"4000.ckpt")
-        # config.resume = None
+        #加载特定权重
+        # config.resume = os.path.join("logs/unidiffuserv1-girl1_1dim_lr0.0001_usei2t_提交版/ckpts/",config.mode,"4000.ckpt")
+        config.resume = None
         #粗调到精调
         while config.save_interval > 10:
             best_source_path,now_step = train(config)
-            config.max_step = now_step + config.save_interval
-            config.save_interval //=2
-            config.eval_interval //=2
+            if config.max_step == now_step:
+                config.max_step = now_step + config.save_interval
+            else:
+                config.max_step = now_step + config.save_interval
+                config.save_interval //=3
+                config.eval_interval //=3
             config.resume = best_source_path
 
 

@@ -359,7 +359,7 @@ def main(argv=None):
     nnet_dict.update(torch.load(config.nnet_path, map_location='cpu'))
 
 
-    nnet.load_state_dict(nnet_dict, False)
+    nnet.load_state_dict(nnet_dict, True)
 
 
 
@@ -368,7 +368,7 @@ def main(argv=None):
     clip_text_model.to("cpu")
 
     # 测评
-    config.data = "train_data/boy1"
+    config.data = "train_data/"+os.path.basename(args.output_path).split("_")[0]
     score_eval = Evaluator()
     refs = glob.glob(os.path.join(config.data, "*.jpg")) + glob.glob(os.path.join(config.data, "*.jpeg"))
     refs_images = [read_img_pil(ref) for ref in refs]
@@ -428,13 +428,13 @@ def main(argv=None):
         if "boy" in prompt:
             prompt = prompt.replace("boy", "man")
         else:
-            prompt = prompt.replace("girl", "female")
+            prompt = prompt.replace("girl", "girl")
         extend_prompt = ",Chinese, Asian, high-definition image, high-quality lighting"
 
         config.prompt = prompt
         config.extend_prompt = extend_prompt
         print("sampling with prompt:", prompt+extend_prompt)
-        sample_scores = sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=config.n_samples*5,score_eval=score_eval)
+        sample_scores = sample(prompt_index, config, nnet, clip_text_model, autoencoder, device,n=config.n_samples*30,score_eval=score_eval)
         all_sample_scores.append(sample_scores)
 
     all_sample_scores = np.concatenate(all_sample_scores)

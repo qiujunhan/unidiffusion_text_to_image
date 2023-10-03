@@ -18,8 +18,8 @@ def get_config(max_step,**kwargs):
     config.text_dim = 64  # reduce dimension
     config.data_type = 1
     config.gradient_accumulation_steps = 1
-    config.log_interval = 500
-    config.eval_interval = 1000
+    config.log_interval = 1500
+    config.eval_interval = 1500
     config.eval_samples = 5
     config.n_select = 10 #n张图片选1张
     config.save_interval = config.eval_interval
@@ -32,7 +32,7 @@ def get_config(max_step,**kwargs):
     config.lr = 1e-4
     config.lora_dim = 1
     # config.suffix = f"{config.lora_dim}dim_lr{config.lr}_sample_新kldiv_loss_提升图文权重_usei2t"
-    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_usei2t_提交版"
+    config.suffix = f"{config.lora_dim}dim_lr{config.lr}_usei2t_只训练edit"
 
     config.clip_img_model = "ViT-B/32"
     # config.clip_text_model = "openai/clip-vit-large-patch14"
