@@ -124,6 +124,7 @@ class TrainState(object):
             elif os.path.isdir(source_file):
                 shutil.copytree(source_file, destination_file)
     def copy_best_ckpt(self,log_path,final_path,config):
+        os.makedirs(final_path,exist_ok=True)
         if config.mode == "sim":
             #最后和人脸得分最大优先原则
             best_step = -1
@@ -156,7 +157,7 @@ class TrainState(object):
                     best_step = step
             best_source_path = os.path.join(log_path, f'{best_step:04}.ckpt')
             with open(os.path.join(final_path,"info.txt"), "a") as f:
-                f.write(f"sim模型 best_step:{best_step} best_mean_score:{best_mean_score} scores:{str(best_scores)}\n")
+                f.write(f"edit模型 best_step:{best_step} best_mean_score:{best_mean_score} scores:{str(best_scores)}\n")
             self.copy_files(source_folder=best_source_path, destination_folder=final_path)
         return best_source_path,best_step
 

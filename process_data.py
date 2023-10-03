@@ -68,7 +68,7 @@ class DataProcessing():
         else:
             raise
         if os.path.exists(output_dir):
-            print("预处理文件已存在")
+            print("提示：预处理文件已存在，跳过生成")
             return
         for dir in self.dir_list:
             pil_image = Image.open(dir).convert("RGB")

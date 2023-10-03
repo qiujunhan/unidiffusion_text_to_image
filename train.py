@@ -46,13 +46,9 @@ def train(config):
     logging.info(f'load nnet from {config.nnet_path}')
     if config.resume != None:
         train_state.resume(config.resume)
-    #加载权重
-    if config.mode == "sim":
-        # train_state.resume( ckpt_path=os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_only_proj_裁剪加原图/ckpts/",config.mode,"0040.ckpt"))
-        pass
-    elif config.mode == "edit":
-        # train_state.resume( ckpt_path=os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_only_proj_裁剪加原图/ckpts/",config.mode,"0020.ckpt"))
-        pass
+        print(f"精细化微调，加载{config.resume}继续训练")
+
+
     # caption_decoder = CaptionDecoder(device=device, **config.caption_decoder)
 
     nnet, optimizer = accelerator.prepare(train_state.nnet, train_state.optimizer)
@@ -170,7 +166,11 @@ def train(config):
         sample_config.n_samples=config.eval_samples
         sample_config.n_iter = 1
         sample_config.sample.sample_steps=20
-        input_prompt = "a {}, wearing a red outfit, sitting on a chair and eating"
+        if config.mode=="edit":
+            input_prompt = "a {}, wearing a red outfit, sitting on a chair and eating"
+        elif config.mode=="sim":
+            sim_assist_prompts = ["a {} standing in the wild"]
+            input_prompt = random.choice(sim_assist_prompts)
         class_word = "man" if "boy" in config.data else "girl"
         # input_prompt = random.choice(assist_prompts)
         input_prompt = input_prompt.format(class_word)
@@ -239,9 +239,9 @@ def train(config):
                     sample_scores,sample_loss = eval(total_step,metrics)
                     sample_scores = torch.tensor(sample_scores, requires_grad=True)
 
-                    # last_save_step = max(config.save_interval,min(total_step,save_step))
+                    last_save_step = max(config.save_interval,min(total_step,save_step))
 
-                    train_state.add_sample(save_step,sample_scores)
+                    train_state.add_sample(last_save_step,sample_scores)
                     eval_step += config.eval_interval
                 if total_step >= log_step or total_step  == config.max_step:
                     logging.info(utils.dct2str(dict(step=total_step, **metrics)))
@@ -297,10 +297,12 @@ def main():
     # 赛手需要根据自己的需求修改config file
     from configs.unidiffuserv1 import get_config
 
-    modes = ["sim", "edit",]
+    # modes = ["sim","edit", ]
+    modes = ["edit", ]
+
     for mode in modes:
         if mode == "sim":
-            config = get_config(max_step=10000)
+            config = get_config(max_step=6000)
             config.mode="sim"
             config.lora.peft_config.target_modules = config.lora.target_modules_sim
 
@@ -324,9 +326,11 @@ def main():
         config.meta_dir = os.path.join(config.workdir, "meta")
         config.nnet_path = args.nnet_path
         os.makedirs(config.workdir, exist_ok=True)
-        config.resume = None
+
+        config.resume = os.path.join("logs/unidiffuserv1-boy1_1dim_lr0.0001_usei2t_提交版/ckpts/",config.mode,"4000.ckpt")
+        # config.resume = None
         #粗调到精调
-        while config.save_interval > 1:
+        while config.save_interval > 10:
             best_source_path,now_step = train(config)
             config.max_step = now_step + config.save_interval
             config.save_interval //=2

@@ -18,10 +18,10 @@ def get_config(max_step,**kwargs):
     config.text_dim = 64  # reduce dimension
     config.data_type = 1
     config.gradient_accumulation_steps = 1
-    config.log_interval = 100
+    config.log_interval = 500
     config.eval_interval = 1000
     config.eval_samples = 5
-    config.n_select = 30 #n张图片选1张
+    config.n_select = 10 #n张图片选1张
     config.save_interval = config.eval_interval
     config.max_step = max_step
     assert config.max_step > config.eval_interval
